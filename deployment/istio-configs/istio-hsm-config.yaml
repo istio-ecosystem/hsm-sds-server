@@ -1,0 +1,47 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: istio
+spec:
+  hub: "localhost:5000"
+  tag: "latest"
+  values:
+    global:
+      imagePullPolicy: IfNotPresent
+    sidecarInjectorWebhook:
+      templates:
+        custom: |
+          spec:
+            containers:
+            - name: testsds
+              image: testuds:latest
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+              - mountPath: /tmp/testsocket1
+                name: sds-server
+              lifecycle:
+                postStart:
+                  exec:
+                    command: 
+                    - "sh"
+                    - "-c"
+                    - >
+                      /bin/touch /tmp/timelog.txt && /bin/echo \"$(date)\" >> /tmp/timelog.txt && /bin/sleep 10s && /bin/echo \"$(date)\" >> /tmp/timelog.txt 
+              command: ["/bin/sleep", "3650d"]
+              env:
+              - name: MOCKSDS
+                value: mock-sds-server
+            - name: istio-proxy
+              volumeMounts:
+              - mountPath: /tmp/testsocket2
+                name: sds-server
+              env:
+              - name: GREETING
+                value: hello-world
+            volumes:
+            - name: sds-server
+              hostPath: 
+                path: /tmp/testsocket
+                type: DirectoryOrCreate
+          
+          
