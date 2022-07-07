@@ -168,9 +168,18 @@ ADD sds-server /sds/sds-server
 
 WORKDIR /
 
+RUN mkdir /usr/local/libsgx
+
 COPY --from=builder /usr/local/lib/libp11* /usr/local/lib/
 COPY --from=builder /opt/intel /opt/intel
-
+COPY --from=builder /usr/local/lib/libp11SgxEnclave.signed.so /usr/local/libsgx/libp11SgxEnclave.signed.so
+COPY --from=builder /usr/local/lib/libp11sgx.so /usr/local/libsgx/libp11sgx.so
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_dcap_ql.so.1 /usr/local/libsgx/libsgx_dcap_ql.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_urts.so /usr/local/libsgx/libsgx_urts.so
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_qe3_logic.so /usr/local/libsgx/libsgx_qe3_logic.so
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_pce_logic.so.1 /usr/local/libsgx/libsgx_pce_logic.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 /usr/local/libsgx/libsgx_enclave_common.so.1
 ENV LD_LIBRARY_PATH="/usr/local/lib"
+ENV SGX_LIBRARY_PATH="/usr/local/libsgx"
 
 # ENTRYPOINT ["/sds/sds-server"]
