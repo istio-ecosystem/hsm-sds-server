@@ -7,12 +7,14 @@ import (
 
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
+	"istio.io/pkg/log"
 
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
 )
 
 const (
+	maxMsgSize    = 20*1024*1024
 	maxStreams    = 10000
 	maxRetryTimes = 5
 )
@@ -37,7 +39,6 @@ type Server struct {
 func NewServer() *Server {
 	s := &Server{stopped: atomic.NewBool(false)}
 	s.workloadSds = newSDSService()
-	s.initWorkloadgRPC()
 	return s
 }
 
@@ -58,76 +59,54 @@ func (s *Server) Stop() {
 	}
 }
 
-func (s *Server) initWorkloadgRPC() {
+func (s *Server) StartmTLSSDSService() error {
 	s.grpcWorkloadServer = grpc.NewServer(s.grpcServerOptions()...)
 	s.workloadSds.register(s.grpcWorkloadServer)
 	var err error
 	s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath)
 	if err != nil {
-		fmt.Println(err)
-		fmt.Println(fmt.Errorf("fail to setup Uds listener in %v", security.WorkloadIdentitySocketPath))
+		log.Info("mTLS listen generation error ", err)
+		return err
 	}
-	fmt.Println("Starting SDS grpc server")
-
-	// if s.grpcWorkloadListener != nil {
-	// 	defer s.grpcWorkloadListener.Close()
-	// 	// TODO: handler receive to DiscoveryRequest
-	// 	s.grpcWorkloadConnection, err = s.grpcWorkloadListener.Accept()
-	// 	if err != nil {
-	// 		fmt.Println("connection init failed %v", err)
-	// 	}
-	// 	// go{
-	// 	// s.grpcWorkloadConnection.onReceive()
-	// 	// }
-	// }
-
-	// for debug
-	// fmt.Println(s.grpcWorkloadServer.GetServiceInfo())
-	// fmt.Println(s.grpcWorkloadListener.Addr())
-	go func() {
-		waitTime := time.Second
-		started := false
-		for i := 0; i < maxRetryTimes; i++ {
-			if s.stopped.Load() {
-				return
+	log.Info("Starting mTLS SDS grpc server")
+	waitTime := time.Second
+	started := false
+	for i := 0; i < maxRetryTimes; i++ {
+		serverOk := true
+		setUpUdsOK := true
+		if s.grpcWorkloadListener == nil {
+			if s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath); err != nil {
+				log.Info("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
+				setUpUdsOK = false
 			}
-			serverOk := true
-			setUpUdsOK := true
-			if s.grpcWorkloadListener == nil {
-				if s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath); err != nil {
-					// sdsServiceLog.Errorf("SDS grpc server for workload proxies failed to set up UDS: %v", err)
-					fmt.Println(fmt.Errorf("SDS grpc server for workload proxies failed to set up UDS: %v", err))
-					setUpUdsOK = false
-				}
-			}
-			if s.grpcWorkloadListener != nil {
-				if err = s.grpcWorkloadServer.Serve(s.grpcWorkloadListener); err != nil {
-					fmt.Println(fmt.Errorf("SDS grpc server failed to start: %v", err))
-					serverOk = false
-				}
-			}
-			if serverOk && setUpUdsOK {
-				fmt.Printf("SDS server started, listening on %q", security.WorkloadIdentitySocketPath)
-				started = true
-				break
-			}
-			time.Sleep(waitTime)
-			waitTime *= 2
 		}
-		if !started {
-			fmt.Printf("SDS grpc server could not be started")
+		if s.grpcWorkloadListener != nil {
+			if err = s.grpcWorkloadServer.Serve(s.grpcWorkloadListener); err != nil {
+				log.Info("SDS grpc server for workload proxies failed to start: ", err)
+				serverOk = false
+			}
 		}
-	}()
+		if serverOk && setUpUdsOK {
+			log.Info("mTLS SDS server for workload certificates started, listening on ", security.WorkloadIdentitySocketPath)
+			started = true
+			break
+		}
+		time.Sleep(waitTime)
+		waitTime *= 2
+	}
+	if !started {
+		log.Info("mTLS SDS grpc server could not be started")
+		return fmt.Errorf("mTLS SDS grpc server could not be started! Error: %v", err)
+	}
+	return nil
 }
 
 func (s *Server) grpcServerOptions() []grpc.ServerOption {
 	grpcOptions := []grpc.ServerOption{
 		grpc.MaxConcurrentStreams(uint32(maxStreams)),
+		grpc.MaxSendMsgSize(maxMsgSize),
+		grpc.MaxRecvMsgSize(maxMsgSize),
 	}
 
 	return grpcOptions
 }
-
-// func onReceive(){
-
-// }

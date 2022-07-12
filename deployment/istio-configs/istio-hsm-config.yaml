@@ -3,8 +3,8 @@ kind: IstioOperator
 metadata:
   name: istio
 spec:
-  hub: "localhost:5000"
-  tag: "latest"
+        #hub: "localhost:5000"
+        #tag: "latest"
   values:
     global:
       imagePullPolicy: IfNotPresent
@@ -14,7 +14,7 @@ spec:
           spec:
             containers:
             - name: testsds
-              image: testuds:latest
+              image: sds-server/sds-server:latest
               imagePullPolicy: IfNotPresent
               volumeMounts:
               - mountPath: /tmp/testsocket1
@@ -23,18 +23,22 @@ spec:
                 postStart:
                   exec:
                     command: 
-                    - "sh"
-                    - "-c"
-                    - >
-                      /bin/touch /tmp/timelog.txt && /bin/echo \"$(date)\" >> /tmp/timelog.txt && /bin/sleep 10s && /bin/echo \"$(date)\" >> /tmp/timelog.txt 
-              command: ["/bin/sleep", "3650d"]
+                    - /sds/sds-server
+                    - wait
               env:
               - name: MOCKSDS
                 value: mock-sds-server
+              volumeMounts:
+              - name: workload-socket
+                mountPath: /var/run/secrets/workload-spiffe-uds
+              - name: credential-socket
+                mountPath: /var/run/secrets/credential-uds
             - name: istio-proxy
               volumeMounts:
               - mountPath: /tmp/testsocket2
                 name: sds-server
+              - name: credential-socket
+                mountPath: /var/run/secrets/credential-uds
               env:
               - name: GREETING
                 value: hello-world
@@ -43,5 +47,8 @@ spec:
               hostPath: 
                 path: /tmp/testsocket
                 type: DirectoryOrCreate
-          
-          
+            - emptyDir:
+              name: workload-socket
+            - emptyDir:
+              name: credential-socket
+

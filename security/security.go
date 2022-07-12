@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	WorkloadIdentitySocketPath = "/var/run/secrets/workload-spiffe-uds/socket.sock"
+	WorkloadIdentitySocketPath = "/var/run/secrets/workload-spiffe-uds/socket"
 	DefaultRSAKeysize          = 2048
 	BlockTypeECPrivateKey      = "EC PRIVATE KEY"
 	BlockTypeRSAPrivateKey     = "RSA PRIVATE KEY" // PKCS#1 private key
