@@ -182,4 +182,4 @@ COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 /usr/local/
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV SGX_LIBRARY_PATH="/usr/local/libsgx"
 
-# ENTRYPOINT ["/sds/sds-server"]
+ENTRYPOINT ["/sds/sds-server"]

@@ -11,20 +11,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"github.com/spf13/cobra"
 	"istio.io/pkg/log"
+
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
 )
 
 const (
 	maxStreams       = 100000
 	maxRetryTimes    = 5
 	maxMsgSize       = 20*1024*1024
-	socketForMTLS    = "/var/run/secrets/workload-spiffe-uds/socket"
 )
 
 var (
 	timeoutSeconds       int
+	periodMillis         int
 	url                  string
-
-	timeoutCheck = make(chan struct{})
 
 	waitCmd = &cobra.Command{
 		Use:   "wait",
@@ -32,24 +32,24 @@ var (
 		RunE: func(c *cobra.Command, args []string) error {
 			log.Info("Waiting for hsm sds server to be ready (timeout:" + strconv.Itoa(timeoutSeconds) + " seconds)...")
 			ctx := context.Background()
-			go func() {
-				time.Sleep(time.Duration(timeoutSeconds) * time.Second)
-				timeoutCheck <- struct{}{}
-			}()
+			var err error
+			timeout := time.After(time.Duration(timeoutSeconds) * time.Second)
+
 			for {
 				select {
-				case <- timeoutCheck:
-					return fmt.Errorf("timeout waiting for mTLS SDS server to become ready.")
-				default:
+				case <-timeout:
+					return fmt.Errorf("timeout waiting for mTLS SDS server to become ready. Last error: %v", err)
+				case <-time.After(time.Duration(periodMillis) * time.Millisecond):
 					log.Info("Need to wait SDS server to become ready!")
 					// SDS server checking process
-					mTLSExists, mTLSErr := checkSocket(ctx, socketForMTLS)
+					mTLSExists, mTLSErr := checkSocket(ctx, security.WorkloadIdentitySocketPath)
 					if mTLSErr != nil {
 						log.Info("Not ready yet for mTLS SDS server error: ", mTLSErr)
+						err = mTLSErr
 						continue
 					}
 					if mTLSExists {
-						log.Infof("UDS file %s found, mTLS SDS server is ready!", socketForMTLS)
+						log.Infof("UDS file %s found, mTLS SDS server is ready!", security.WorkloadIdentitySocketPath)
 						return nil
 					}
 				}
@@ -111,4 +111,5 @@ func socketHealthCheck(ctx context.Context, socketPath string) error {
 
 func init() {
 	waitCmd.PersistentFlags().IntVar(&timeoutSeconds, "timeoutSeconds", 60, "maximum number of seconds to wait for Envoy to be ready")
+	waitCmd.PersistentFlags().IntVar(&periodMillis, "periodMillis", 500, "number of milliseconds to wait between attempts")
 }
