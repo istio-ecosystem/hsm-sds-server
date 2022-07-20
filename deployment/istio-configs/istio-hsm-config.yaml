@@ -3,8 +3,9 @@ kind: IstioOperator
 metadata:
   name: istio
 spec:
-        #hub: "localhost:5000"
-        #tag: "latest"
+  # profile: minimal
+  # hub: "istio"
+  # tag: "latest"
   values:
     global:
       imagePullPolicy: IfNotPresent
@@ -16,29 +17,36 @@ spec:
             - name: testsds
               image: sds-server/sds-server:latest
               imagePullPolicy: IfNotPresent
-              volumeMounts:
-              - mountPath: /tmp/testsocket1
-                name: sds-server
               lifecycle:
                 postStart:
                   exec:
                     command: 
-                    - /sds/sds-server
-                    - wait
+                    - sh
+                    - "-c"
+                    - |-
+                      ./copylib.sh && /sds/sds-server wait
               env:
               - name: MOCKSDS
                 value: mock-sds-server
               volumeMounts:
+              - name: sds-server
+                mountPath: /tmp/testsocket1
               - name: workload-socket
                 mountPath: /var/run/secrets/workload-spiffe-uds
               - name: credential-socket
                 mountPath: /var/run/secrets/credential-uds
+              - name: sgx-libraries
+                mountPath: /usr/local/libsgx
             - name: istio-proxy
               volumeMounts:
-              - mountPath: /tmp/testsocket2
-                name: sds-server
+              - name: sds-server
+                mountPath: /tmp/testsocket2
+              - name: workload-socket
+                mountPath: /var/run/secrets/workload-spiffe-uds
               - name: credential-socket
                 mountPath: /var/run/secrets/credential-uds
+              - name: sgx-libraries
+                mountPath: /usr/local/libsgx
               env:
               - name: GREETING
                 value: hello-world
@@ -51,4 +59,6 @@ spec:
               name: workload-socket
             - emptyDir:
               name: credential-socket
+            - emptyDir:
+              name: sgx-libraries
 

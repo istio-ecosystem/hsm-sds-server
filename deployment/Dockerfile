@@ -9,4 +9,5 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
     apt-get install -y \
     wget \
     netcat \
-    vim 
+    vim \
+    patchelf

@@ -41,7 +41,6 @@ spec:
         command: ["/bin/touch", "/var/run/secrets/workload-spiffe-uds/socket.sock"]
         image: testuds:latest
         imagePullPolicy: Never
-        
         volumeMounts:
         - mountPath: /var/run/secrets/workload-spiffe-uds
           name: sds-server

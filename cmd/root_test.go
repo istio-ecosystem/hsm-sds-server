@@ -5,12 +5,13 @@ import (
 	"net"
 	"testing"
 
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestUdsListener(t *testing.T) {
-	l, err := newListener("./tmp/sc/test")
+	l, err := uds.NewListener("./tmp/sc/test")
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
