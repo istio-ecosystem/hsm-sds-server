@@ -169,22 +169,25 @@ ADD sds-server /sds/sds-server
 
 WORKDIR /
 
-RUN mkdir /usr/local/tmplibsgx
-
-COPY --from=builder /usr/local/lib/libp11* /usr/local/lib/
-COPY --from=builder /opt/intel /opt/intel
-COPY --from=builder /usr/bin/patchelf /usr/bin/patchelf
-COPY --from=builder /usr/local/lib/libp11SgxEnclave.signed.so /usr/local/tmplibsgx/libp11SgxEnclave.signed.so
-COPY --from=builder /usr/local/lib/libp11sgx.so /usr/local/tmplibsgx/libp11sgx.so
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_dcap_ql.so.1 /usr/local/tmplibsgx/libsgx_dcap_ql.so.1
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_urts.so /usr/local/tmplibsgx/libsgx_urts.so
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_qe3_logic.so /usr/local/tmplibsgx/libsgx_qe3_logic.so
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_pce_logic.so.1 /usr/local/tmplibsgx/libsgx_pce_logic.so.1
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 /usr/local/tmplibsgx/libsgx_enclave_common.so.1
+# RUN mkdir /usr/local/tmplibsgx
 
 ADD copylib.sh copylib.sh
 # RUN /bin/sh copylib.sh
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV SGX_LIBRARY_PATH="/usr/local/libsgx"
+ENV SGX_TMP_LIBRARY_PATH="/usr/local/tmplibsgx"
+RUN mkdir $SGX_TMP_LIBRARY_PATH
+
+COPY --from=builder $LD_LIBRARY_PATH/libp11* $LD_LIBRARY_PATH/
+COPY --from=builder /opt/intel /opt/intel
+COPY --from=builder /usr/bin/patchelf /usr/bin/patchelf
+COPY --from=builder $LD_LIBRARY_PATH/libp11SgxEnclave.signed.so $SGX_TMP_LIBRARY_PATH/libp11SgxEnclave.signed.so
+COPY --from=builder $LD_LIBRARY_PATH/libp11sgx.so $SGX_TMP_LIBRARY_PATH/libp11sgx.so
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_dcap_ql.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_dcap_ql.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_urts.so $SGX_TMP_LIBRARY_PATH/libsgx_urts.so
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_qe3_logic.so $SGX_TMP_LIBRARY_PATH/libsgx_qe3_logic.so
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_pce_logic.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_pce_logic.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_enclave_common.so.1
+
 
 ENTRYPOINT ["/sds/sds-server"]

@@ -1,8 +1,9 @@
 #!/bin/sh
 
 copy_libraries () {
-    cp -r /usr/local/tmplibsgx/* $SGX_LIBRARY_PATH
-    rm -rf /usr/local/tmplibsgx
+    # mkdir $SGX_LIBRARY_PATH
+    cp -r $SGX_TMP_LIBRARY_PATH/* $SGX_LIBRARY_PATH
+    rm -rf $SGX_TMP_LIBRARY_PATH
     echo "Copy Finished"
 }
 
