@@ -41,8 +41,6 @@ spec:
               volumeMounts:
               - name: sds-server
                 mountPath: /tmp/testsocket2
-              - name: workload-socket
-                mountPath: /var/run/secrets/workload-spiffe-uds
               - name: credential-socket
                 mountPath: /var/run/secrets/credential-uds
               - name: sgx-libraries
