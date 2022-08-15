@@ -1,0 +1,72 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: istio
+spec:
+  values:
+    global:
+      imagePullPolicy: IfNotPresent
+    sidecarInjectorWebhook:
+      templates:
+        custom: |
+          spec:
+            containers:
+            - name: testsds
+              image: sds-server/sds-server:latest
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+              - mountPath: /tmp/testsocket1
+                name: sds-server
+              lifecycle:
+                postStart:
+                  exec:
+                    command: 
+                    - /sds/sds-server
+                    - wait
+              env:
+              - name: MOCKSDS
+                value: mock-sds-server
+              volumeMounts:
+              - name: workload-socket
+                mountPath: /var/run/secrets/workload-spiffe-uds
+              - name: credential-socket
+                mountPath: /var/run/secrets/credential-uds
+            - name: istio-proxy
+              volumeMounts:
+              - mountPath: /tmp/testsocket2
+                name: sds-server
+              - name: credential-socket
+                mountPath: /var/run/secrets/credential-uds
+              env:
+              - name: GREETING
+                value: hello-world
+            volumes:
+            - name: sds-server
+              hostPath: 
+                path: /tmp/testsocket
+                type: DirectoryOrCreate
+            - emptyDir:
+              name: workload-socket
+            - emptyDir:
+              name: credential-socket
+    gateways:
+      istio-ingressgateway:
+        additionalContainers:
+          - name: testsds
+            image: sds-server/sds-server:latest
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+            - mountPath: /tmp/testsocket1
+              name: sds-server
+            lifecycle:
+              postStart:
+                exec:
+                  command: 
+                  - /sds/sds-server
+                  - wait
+            env:
+            - name: MOCKSDS
+              value: mock-sds-server
+            volumeMounts:
+            - name: workload-socket
+              mountPath: /var/run/secrets/workload-spiffe-uds
