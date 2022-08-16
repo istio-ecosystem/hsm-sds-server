@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
 	"flag"
-
-	"github.com/spf13/cobra"
-	"istio.io/pkg/log"
+	"fmt"
 
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/sds"
+	"github.com/spf13/cobra"
+	"istio.io/pkg/log"
 )
 
 func NewRootCommand() *cobra.Command {
@@ -30,7 +30,7 @@ func NewRootCommand() *cobra.Command {
 			if mTLSServer == nil {
 				return fmt.Errorf("failed to create mTLS SDS grpc server!")
 			}
-			mTLSErr := mTLSServer.StartmTLSSDSService()
+			mTLSErr := mTLSServer.StartmTLSSDSService(context.Background())
 			return mTLSErr
 		},
 	}

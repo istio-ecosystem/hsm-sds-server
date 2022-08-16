@@ -7,13 +7,14 @@ import (
 	"io"
 	"time"
 
+	"istio.io/pkg/log"
+
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	sds "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
+	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security/pki/util"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -25,42 +26,46 @@ type sdsservice struct {
 	stop   chan struct{}
 	reqch  chan *discovery.DiscoveryRequest
 	respch chan *discovery.DiscoveryResponse
-	// rootCaPath string
 }
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
 func newSDSService() *sdsservice {
+	log.Info("DEBUG 2: starting sdsservice")
 	ret := &sdsservice{
 		stop:   make(chan struct{}),
 		reqch:  make(chan *discovery.DiscoveryRequest, 1),
 		respch: make(chan *discovery.DiscoveryResponse, 1),
 	}
 	options := security.CertOptions{
-		Host:      "temp",
-		IsCA:      false,
-		TTL:       time.Hour * 24,
-		NotBefore: time.Now(),
+		Host:       "temp",
+		IsCA:       false,
+		TTL:        time.Hour * 24,
+		NotBefore:  time.Now(),
+		RSAKeySize: security.DefaultRSAKeysize,
 	}
 
 	ret.st = util.NewSecretManager(&options)
-	ret.st.GenerateK8sCSR(options)
+	if _, _, err := ret.st.GenerateK8sCSR(options); err != nil {
+		log.Info("DEBUG 3: Generate CSR error: ", err)
+	}
 
 	return ret
 }
 
 // register adds the SDS handle to the grpc server
-func (s *sdsservice) register(rpcs *grpc.Server) {
-	sds.RegisterSecretDiscoveryServiceServer(rpcs, s)
-}
+// func (s *sdsservice) register(rpcs *grpc.Server) {
+// 	sdsv3.RegisterSecretDiscoveryServiceServer(rpcs, s)
+// }
 
-func (s *sdsservice) StreamSecrets(stream sds.SecretDiscoveryService_StreamSecretsServer) error {
+func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSecretsServer) error {
 	// TODO: Authenticate the stream context before handle it
 	// identitys, err := s.Authenticate(stream.Context())
+	log.Info("DEBUG 6: StreamSecret called")
 	errch := make(chan error, 1)
 	go func() {
 		for {
 			req, err := stream.Recv()
-			fmt.Println("Request: ", req)
+			log.Info("DEBUG 5 Request: ", req)
 			if err != nil {
 				if status.Code(err) == codes.Canceled || errors.Is(err, io.EOF) {
 					err = nil
@@ -89,7 +94,7 @@ func (s *sdsservice) StreamSecrets(stream sds.SecretDiscoveryService_StreamSecre
 	}
 }
 
-func (s *sdsservice) DeltaSecrets(stream sds.SecretDiscoveryService_DeltaSecretsServer) error {
+func (s *sdsservice) DeltaSecrets(stream sdsv3.SecretDiscoveryService_DeltaSecretsServer) error {
 	return status.Error(codes.Unimplemented, "DeltaSecrets not implemented")
 }
 
@@ -117,7 +122,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
 	}
 	var keyPEM []byte
-	// keyPEM = encode(privkey)
+	// keyPEM = encodeKey(privkey)
 	msg, _ := anypb.New(&tlsv3.Secret{
 		Name: req.ResourceNames[0],
 		Type: &tlsv3.Secret_TlsCertificate{
