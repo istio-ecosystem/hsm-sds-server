@@ -3,10 +3,8 @@
 # Build the manager binary
 FROM ubuntu:20.04 as builder
 
-ARG GO_VERSION="1.18.1"
 ARG SDK_VERSION="2.17.100.3"
 ARG SGX_SDK_INSTALLER=sgx_linux_x64_sdk_${SDK_VERSION}.bin
-# ARG DCAP_VERSION="1.12.100.3"
 ENV DEBIAN_FRONTEND=noninteractive
 # SGX prerequisites
 # hadolint ignore=DL3005,DL3008
@@ -18,26 +16,20 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
   && apt-get install --no-install-recommends -y \
     ca-certificates \
     curl \
-    linux-tools-generic \
     wget \
     unzip \
     protobuf-compiler \
     libprotobuf-dev \
     build-essential \
-    cmake \
-    pkg-config \
-    gdb \
-    vim \
-    python3 \
+    patchelf \ 
     git \
     gnupg \
-    patchelf \
-  && update-ca-certificates \
-# Add 01.org to apt for SGX packages
-# hadolint ignore=DL4006
+  && update-ca-certificates \ 
+  # Add 01.org to apt for SGX packages
+  # hadolint ignore=DL4006
   && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main" >> /etc/apt/sources.list.d/intel-sgx.list \
   && wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - \
-# Install SGX PSW
+  # Install SGX PSW
   && apt-get update \
   && apt-get install --no-install-recommends -y \
     libsgx-enclave-common=${SDK_VERSION}-focal1 \
@@ -106,17 +98,6 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
   && make && make install
 
 RUN ls -l /opt/intel/
-
-# Install golang
-WORKDIR /workspace
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && curl -L https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -zxf - -C / \
-  && mkdir -p /usr/local/bin/ \
-  && for i in /go/bin/*; do ln -s $i /usr/local/bin/; done
-
 
 ###
 # Clean runtime image which supposed to
