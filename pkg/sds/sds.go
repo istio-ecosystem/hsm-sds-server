@@ -13,6 +13,8 @@ import (
 	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
+	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security/pki/util"
 	"google.golang.org/grpc/codes"
@@ -36,8 +38,9 @@ func newSDSService() *sdsservice {
 		reqch:  make(chan *discovery.DiscoveryRequest, 1),
 		respch: make(chan *discovery.DiscoveryResponse, 1),
 	}
+
 	options := security.CertOptions{
-		Host:       "temp",
+		// Host:       csrHost.String(),
 		IsCA:       false,
 		TTL:        time.Hour * 24,
 		NotBefore:  time.Now(),
@@ -45,9 +48,6 @@ func newSDSService() *sdsservice {
 	}
 
 	ret.st = util.NewSecretManager(&options)
-	if _, _, err := ret.st.GenerateK8sCSR(options); err != nil {
-		log.Info("DEBUG 3: Generate CSR error: ", err)
-	}
 
 	return ret
 }
@@ -65,7 +65,7 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 	go func() {
 		for {
 			req, err := stream.Recv()
-			log.Info("DEBUG 5 Request: ", req)
+			// log.Info("DEBUG 5 Request: ", req)
 			if err != nil {
 				if status.Code(err) == codes.Canceled || errors.Is(err, io.EOF) {
 					err = nil
@@ -80,6 +80,16 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 	for {
 		select {
 		case newReq := <-s.reqch:
+			if s.st.SgxContext == nil {
+				s.st.SgxContext, _ = sgx.NewContext(sgx.Config{
+					HSMTokenLabel: sgx.HSMTokenLabel,
+					HSMUserPin:    sgx.HSMUserPin,
+					HSMSoPin:      sgx.HSMSoPin,
+					HSMConfigPath: sgx.SgxLibrary,
+					HSMKeyLabel:   sgx.DefaultKeyLabel,
+					HSMKeyType:    sgx.HSMKeyType,
+				})
+			}
 			lastReq = newReq
 		case err := <-errch:
 			return err
@@ -113,34 +123,46 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		TypeUrl:     req.TypeUrl,
 		VersionInfo: req.VersionInfo,
 	}
-	csrBytes, _, err := s.st.GenerateK8sCSR(security.CertOptions{
-		Host:       req.TypeUrl,
-		IsCA:       false,
-		RSAKeySize: security.DefaultRSAKeysize,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
-	}
-	var keyPEM []byte
-	// keyPEM = encodeKey(privkey)
-	msg, _ := anypb.New(&tlsv3.Secret{
-		Name: req.ResourceNames[0],
-		Type: &tlsv3.Secret_TlsCertificate{
-			TlsCertificate: &tlsv3.TlsCertificate{
-				CertificateChain: &corev3.DataSource{
-					Specifier: &corev3.DataSource_InlineBytes{
-						InlineBytes: csrBytes,
+	for _, resourceName := range req.ResourceNames {
+		// TODO: Encapsulate these functions and do the following steps:
+		// Find the certificate in the secretManager cache
+		// Generate CSR by resource name (`ROOTCA` or `default`)
+		// Get certificate (This should be handle by k8s client)
+		// Register the Certificate
+		cert, err := s.st.GenerateSecret(resourceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed Create Certificate %v", err)
+		}
+		conf, _ := anypb.New(&sgxv3aplha.SgxPrivateKeyMethodConfig{
+			SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
+			KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
+			UsrPin:     s.st.SgxConfigs.HSMUserPin,
+			SoPin:      s.st.SgxConfigs.HSMSoPin,
+			TokenLabel: s.st.SgxConfigs.HSMTokenLabel,
+			KeyType:    s.st.SgxConfigs.HSMKeyType,
+		})
+
+		msg, _ := anypb.New(&tlsv3.Secret{
+			Name: resourceName,
+			Type: &tlsv3.Secret_TlsCertificate{
+				TlsCertificate: &tlsv3.TlsCertificate{
+					CertificateChain: &corev3.DataSource{
+						Specifier: &corev3.DataSource_InlineBytes{
+							InlineBytes: cert,
+						},
 					},
-				},
-				// TODO: privateKey should be sgx private key
-				PrivateKey: &corev3.DataSource{
-					Specifier: &corev3.DataSource_InlineBytes{
-						InlineBytes: keyPEM,
+					PrivateKeyProvider: &tlsv3.PrivateKeyProvider{
+						ProviderName: "sgx",
+						ConfigType: &tlsv3.PrivateKeyProvider_TypedConfig{
+							TypedConfig: conf,
+						},
 					},
+					PrivateKey: nil,
 				},
 			},
-		},
-	})
-	resp.Resources = append(resp.Resources, msg)
+		})
+		resp.Resources = append(resp.Resources, msg)
+	}
+	log.Info("DEBUG SDS Resp: ", resp)
 	return resp, nil
 }

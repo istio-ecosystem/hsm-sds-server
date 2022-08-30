@@ -43,8 +43,6 @@ func NewServer() *Server {
 		stopped: atomic.NewBool(false),
 		errChan: make(chan error),
 	}
-	// TODO: make this sdsservice as a sdsv3.SecretDiscoveryServiceServer
-	// using interface
 	s.newSDSv3Server = func() sdsv3.SecretDiscoveryServiceServer {
 		return newSDSService()
 	}

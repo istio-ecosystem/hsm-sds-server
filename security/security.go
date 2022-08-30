@@ -3,29 +3,57 @@ package security
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"math/big"
+	"sync"
 	"time"
+
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
+	// "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security/pki/util"
+	"istio.io/pkg/env"
+	"istio.io/pkg/log"
 )
 
 const (
 	WorkloadIdentitySocketPath = "/var/run/secrets/workload-spiffe-uds/socket"
 	DefaultRSAKeysize          = 2048
-	BlockTypeECPrivateKey      = "EC PRIVATE KEY"
-	BlockTypeRSAPrivateKey     = "RSA PRIVATE KEY" // PKCS#1 private key
-	BlockTypePKCS8PrivateKey   = "PRIVATE KEY"     // PKCS#8 plain private key
+	RootCertName               = "ROOTCA"
+	WorkloadCertName           = "default"
 )
-
-// type SecretManager interface {
-// 	GenerateK8sCSR(options CertOptions) ([]byte, error)
-// }
 
 type SecretManager struct {
 	Name string
 	// configOptions includes all configurable params for the cache.
 	ConfigOptions *CertOptions
+	SgxConfigs    *sgx.Config
+	SgxContext    *sgx.SgxContext
+	cache         *secretCache
+}
+
+type secretCache struct {
+	mu       sync.RWMutex
+	workload *SecretItem
+	rootCert []byte
+	csrBytes []byte
+}
+
+type SecretItem struct {
+	CertificateChain []byte
+	PrivateKeyLabel  []byte
+
+	RootCert []byte
+
+	// ResourceName passed from envoy SDS discovery request.
+	// "ROOTCA" for root cert request, "default" for key/cert request.
+	ResourceName string
+
+	CreatedTime time.Time
+
+	ExpireTime time.Time
 }
 
 // SupportedECSignatureAlgorithms are the types of EC Signature Algorithms
@@ -35,7 +63,35 @@ type SupportedECSignatureAlgorithms string
 const (
 	// only ECDSA using P256 is currently supported
 	EcdsaSigAlg SupportedECSignatureAlgorithms = "ECDSA"
+	RsaSignAlg  SupportedECSignatureAlgorithms = "RSA"
 )
+
+func (alg SupportedECSignatureAlgorithms) String() string {
+	return string(alg)
+}
+
+const (
+	Scheme = "spiffe"
+
+	URIPrefix    = Scheme + "://"
+	URIPrefixLen = len(URIPrefix)
+
+	// The default SPIFFE URL value for trust domain
+	defaultTrustDomain    = "cluster.local"
+	ServiceAccountSegment = "sa"
+	NamespaceSegment      = "ns"
+)
+
+// SPIFFE Identity type define
+type SPIFFEIdentity struct {
+	TrustDomain    string
+	Namespace      string
+	ServiceAccount string
+}
+
+func (i SPIFFEIdentity) String() string {
+	return URIPrefix + i.TrustDomain + "/ns/" + i.Namespace + "/sa/" + i.ServiceAccount
+}
 
 type CertOptions struct {
 	// Comma-separated hostnames and IPs to generate a certificate for.
@@ -91,24 +147,154 @@ type CertOptions struct {
 	DNSNames string
 }
 
-func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, *rsa.PrivateKey, error) {
-	// sgx.NewContext()
-	priv, err := rsa.GenerateKey(rand.Reader, options.RSAKeySize)
-	if err != nil {
-		return nil, nil, fmt.Errorf("RSA key generation failed (%v)", err)
+var (
+	TrustDomain = env.RegisterStringVar("TRUST_DOMAIN", "cluster.local",
+		"The trust domain for spiffe certificates").Get()
+	WorkloadNamespace = env.RegisterStringVar("POD_NAMESPACE", "", "").Get()
+	ServiceAccount    = env.RegisterStringVar("SERVICE_ACCOUNT", "", "Name of service account").Get()
+)
+
+func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
+	isCA := false
+	log.Info(resourceName)
+	var cert []byte
+	// var err error
+	if resourceName == RootCertName {
+		isCA = true
 	}
+	if isCA {
+		// if cert, err = sc.getCacheRootCert(); cert != nil {
+		// 	log.Info("Find root cert in secret cache")
+		// 	return cert, err
+		// }
+	} else {
+		csrBytes, err := sc.GenerateK8sCSR(CertOptions{
+			IsCA:       isCA,
+			TTL:        time.Hour * 240,
+			NotBefore:  time.Now(),
+			RSAKeySize: DefaultRSAKeysize,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
+		}
+		cert, err = sc.CreateNewCertificate(csrBytes, time.Hour*240, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
+			[]x509.ExtKeyUsage{})
+		if err != nil {
+			return nil, fmt.Errorf("failed Create Certificate %v", err)
+		}
+	}
+	// sc.registerSecret(isCA, cert)
+	return cert, nil
+}
+
+func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, error) {
+	// if options.IsCA {
+	// 	// TODO: find RootCert
+	// 	if rootcert, err := sc.getCacheRootCert(); rootcert != nil {
+	// 		log.Info("Find root cert in secret cache")
+	// 		return rootcert, err
+	// 	}
+	// }
+
+	csrHostName := &SPIFFEIdentity{
+		TrustDomain:    TrustDomain,
+		Namespace:      WorkloadNamespace,
+		ServiceAccount: ServiceAccount,
+	}
+
+	options.Host = csrHostName.String()
+
 	template, err := GenCSRTemplate(options)
 	if err != nil {
-		return nil, nil, fmt.Errorf("CSR template creation failed (%v)", err)
+		return nil, fmt.Errorf("CSR template creation failed (%v)", err)
 	}
+	log.Info("DEBUG Template:", template)
+	var privKey crypto.Signer
 
-	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, template, crypto.PrivateKey(priv))
+	cryptoctx, err := sc.SgxContext.GetCryptoContext()
 	if err != nil {
-		return nil, nil, fmt.Errorf("CSR creation failed (%v)", err)
+		return nil, fmt.Errorf("failed find crypto11 context: %v", err)
 	}
+	privKey, err = cryptoctx.FindKeyPair(nil, []byte(sc.SgxConfigs.HSMKeyLabel))
+	if err != nil {
+		return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
+	}
+	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, template, privKey)
+	if err != nil {
+		return nil, fmt.Errorf("CSR creation failed (%v)", err)
+	}
+	log.Info("DEBUG csrBytes:", csrBytes)
+	// certTemplate, _ := GenCertTemplate(csrBytes, time.Hour*24, false, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
+	// 	[]x509.ExtKeyUsage{})
+	// cert, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("Create Certificate failed (%v)", err)
+	// }
+	csrPem, err := encodePem(true, csrBytes, privKey)
+	return csrPem, err
+}
 
-	// csr, privKey, err := encodePem(true, csrBytes, priv, options.PKCS8Key)
-	return csrBytes, priv, err
+func (sc *SecretManager) CreateNewCertificate(csrPEM []byte, duration time.Duration, isCA bool, keyUsage x509.KeyUsage, extKeyUsage []x509.ExtKeyUsage) ([]byte, error) {
+	var cert []byte
+	var err error
+	// FIXME
+	// if cert, err = sc.getCacheWorkloadCert(); cert != nil {
+	// 	log.Info("Find cert in secret cache")
+	// 	return cert, err
+	// }
+	certTemplate, err := GenCertTemplate(csrPEM, duration, isCA, keyUsage, extKeyUsage)
+	if err != nil {
+		return nil, fmt.Errorf("Generate cert template error: (%v)", err)
+	}
+	var privKey crypto.Signer
+
+	cryptoctx, err := sc.SgxContext.GetCryptoContext()
+	if err != nil {
+		return nil, fmt.Errorf("failed find crypto11 context: %v", err)
+	}
+	privKey, err = cryptoctx.FindKeyPair(nil, []byte(sc.SgxConfigs.HSMKeyLabel))
+	if err != nil {
+		return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
+	}
+	cert, err = x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)
+	if err != nil {
+		return nil, fmt.Errorf("Create Certificate failed (%v)", err)
+	}
+	log.Info("DEBUG: Cert generated: ", cert)
+	return cert, err
+}
+
+// GetRoot returns cached root cert and cert expiration time. This method is thread safe.
+func (sc *SecretManager) GetRoot() (rootCert []byte) {
+	sc.cache.mu.RLock()
+	defer sc.cache.mu.RUnlock()
+	return sc.cache.rootCert
+}
+
+// SetRoot sets root cert into cache. This method is thread safe.
+func (sc *SecretManager) SetRoot(rootCert []byte) {
+	sc.cache.mu.Lock()
+	defer sc.cache.mu.Unlock()
+	sc.cache.rootCert = rootCert
+}
+
+func (sc *SecretManager) GetWorkload() *SecretItem {
+	sc.cache.mu.RLock()
+	defer sc.cache.mu.RUnlock()
+	if sc.cache.workload == nil {
+		return nil
+	}
+	return sc.cache.workload
+}
+
+func (sc *SecretManager) SetWorkload(value *SecretItem) {
+	sc.cache.mu.Lock()
+	defer sc.cache.mu.Unlock()
+	sc.cache.workload = value
+}
+
+func (sc *SecretManager) registerSecret(item SecretItem) {
+
 }
 
 // GenCSRTemplate generates a certificateRequest template with the given options.
@@ -119,23 +305,70 @@ func GenCSRTemplate(options CertOptions) (*x509.CertificateRequest, error) {
 		},
 	}
 
-	// TODO: build SAN extension
-	// if h := options.Host; len(h) > 0 {
-	// 	s, err := BuildSubjectAltNameExtension(h)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	if options.IsDualUse {
-	// 		cn, err := DualUseCommonName(h)
-	// 		if err != nil {
-	// 			// log and continue
-	// 			log.Errorf("dual-use failed for CSR template - omitting CN (%v)", err)
-	// 		} else {
-	// 			template.Subject.CommonName = cn
-	// 		}
-	// 	}
-	// 	template.ExtraExtensions = []pkix.Extension{*s}
-	// }
+	// Build spiffe extension here
+	if h := options.Host; len(h) > 0 {
+		s, err := BuildSubjectAltNameExtension(h)
+		if err != nil {
+			return nil, err
+		}
+		template.ExtraExtensions = []pkix.Extension{*s}
+	}
+
+	// TODO: Add Quote Extension
 
 	return template, nil
+}
+
+var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
+
+func GenCertTemplate(csrPEM []byte, duration time.Duration, isCA bool, keyUsage x509.KeyUsage, extKeyUsage []x509.ExtKeyUsage) (*x509.Certificate, error) {
+	block, _ := pem.Decode(csrPEM)
+	if block == nil {
+		return nil, errors.New("failed to decode csr")
+		// log.Info(err)
+	}
+
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := csr.CheckSignature(); err != nil {
+		return nil, err
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate serial number: %s", err.Error())
+	}
+
+	return &x509.Certificate{
+		Version:               csr.Version,
+		BasicConstraintsValid: true,
+		SerialNumber:          serialNumber,
+		PublicKeyAlgorithm:    csr.PublicKeyAlgorithm,
+		PublicKey:             csr.PublicKey,
+		IsCA:                  isCA,
+		Subject:               csr.Subject,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(duration),
+		// see http://golang.org/pkg/crypto/x509/#KeyUsage
+		KeyUsage:       keyUsage,
+		ExtKeyUsage:    extKeyUsage,
+		DNSNames:       csr.DNSNames,
+		IPAddresses:    csr.IPAddresses,
+		EmailAddresses: csr.EmailAddresses,
+		URIs:           csr.URIs,
+	}, nil
+}
+
+func encodePem(isCSR bool, csrOrCert []byte, priv interface{}) (
+	csrOrCertPem []byte, err error) {
+	encodeMsg := "CERTIFICATE"
+	if isCSR {
+		encodeMsg = "CERTIFICATE REQUEST"
+	}
+	csrOrCertPem = pem.EncodeToMemory(&pem.Block{Type: encodeMsg, Bytes: csrOrCert})
+	err = nil
+	return
 }

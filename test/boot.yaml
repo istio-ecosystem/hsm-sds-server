@@ -1,3 +1,9 @@
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 12346
 static_resources:
   clusters:
   - name: service-http
