@@ -7,6 +7,8 @@ import (
 	"io"
 	"time"
 
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
 	"istio.io/pkg/log"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -133,18 +135,30 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		if err != nil {
 			return nil, fmt.Errorf("failed Create Certificate %v", err)
 		}
-		conf, _ := anypb.New(&sgxv3aplha.SgxPrivateKeyMethodConfig{
-			SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
-			KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
-			UsrPin:     s.st.SgxConfigs.HSMUserPin,
-			SoPin:      s.st.SgxConfigs.HSMSoPin,
-			TokenLabel: s.st.SgxConfigs.HSMTokenLabel,
-			KeyType:    s.st.SgxConfigs.HSMKeyType,
-		})
-
-		msg, _ := anypb.New(&tlsv3.Secret{
+		secret := &tlsv3.Secret{
 			Name: resourceName,
-			Type: &tlsv3.Secret_TlsCertificate{
+		}
+		if resourceName == security.RootCertName {
+			secret.Type = &tlsv3.Secret_ValidationContext{
+				ValidationContext: &tlsv3.CertificateValidationContext{
+					TrustedCa: &corev3.DataSource{
+						Specifier: &corev3.DataSource_InlineBytes{
+							InlineBytes: cert,
+						},
+					},
+				},
+			}
+		} else {
+			conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
+				SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
+				KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
+				UsrPin:     s.st.SgxConfigs.HSMUserPin,
+				SoPin:      s.st.SgxConfigs.HSMSoPin,
+				TokenLabel: s.st.SgxConfigs.HSMTokenLabel,
+				KeyType:    s.st.SgxConfigs.HSMKeyType,
+			})
+
+			secret.Type = &tlsv3.Secret_TlsCertificate{
 				TlsCertificate: &tlsv3.TlsCertificate{
 					CertificateChain: &corev3.DataSource{
 						Specifier: &corev3.DataSource_InlineBytes{
@@ -159,10 +173,38 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 					},
 					PrivateKey: nil,
 				},
-			},
-		})
-		resp.Resources = append(resp.Resources, msg)
+			}
+		}
+
+		res := MessageToAny(secret)
+		resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
+			Name:     resourceName,
+			Resource: res,
+		}))
 	}
+
 	log.Info("DEBUG SDS Resp: ", resp)
 	return resp, nil
+}
+
+// MessageToAny converts from proto message to proto Any
+func MessageToAny(msg proto.Message) *anypb.Any {
+	out, err := MessageToAnyWithError(msg)
+	if err != nil {
+		log.Error(fmt.Sprintf("error marshaling Any %s: %v", prototext.Format(msg), err))
+		return nil
+	}
+	return out
+}
+
+func MessageToAnyWithError(msg proto.Message) (*anypb.Any, error) {
+	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	return &anypb.Any{
+		// nolint: staticcheck
+		TypeUrl: "type.googleapis.com/" + string(msg.ProtoReflect().Descriptor().FullName()),
+		Value:   b,
+	}, nil
 }

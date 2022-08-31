@@ -173,8 +173,8 @@ func NewContext(cfg Config) (*SgxContext, error) {
 		// k8sClient: client,
 		log: ctrl.Log.WithName("SGX"),
 	}
-	ctx.ctxLock.Lock()
-	defer ctx.ctxLock.Unlock()
+	// ctx.ctxLock.Lock()
+	// defer ctx.ctxLock.Unlock()
 	if err := ctx.reloadCryptoContext(); err != nil {
 		if err.Error() == "could not find PKCS#11 token" /* crypto11.errNotFoundError */ {
 			ctx.log.V(3).Info("No existing token found, creating new token...")

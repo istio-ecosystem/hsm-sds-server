@@ -3,11 +3,13 @@ package security
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -163,10 +165,24 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 		isCA = true
 	}
 	if isCA {
-		// if cert, err = sc.getCacheRootCert(); cert != nil {
+		// if cert = sc.GetRoot(); cert != nil {
 		// 	log.Info("Find root cert in secret cache")
 		// 	return cert, err
 		// }
+		cryptoctx, err := sc.SgxContext.GetCryptoContext()
+		if err != nil {
+			return nil, fmt.Errorf("failed find crypto11 context: %v", err)
+		}
+		privKey, err := cryptoctx.FindKeyPair(nil, []byte(sc.SgxConfigs.HSMKeyLabel))
+		if err != nil {
+			return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
+		}
+		certByte, err := newCACertificate(privKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed generate root cert: %v", err)
+		}
+		// sc.SetRoot(certByte)
+		cert, _ = encodePem(false, certByte)
 	} else {
 		csrBytes, err := sc.GenerateK8sCSR(CertOptions{
 			IsCA:       isCA,
@@ -223,14 +239,14 @@ func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("CSR creation failed (%v)", err)
 	}
-	log.Info("DEBUG csrBytes:", csrBytes)
+	// log.Info("DEBUG csrBytes:", csrBytes)
 	// certTemplate, _ := GenCertTemplate(csrBytes, time.Hour*24, false, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
 	// 	[]x509.ExtKeyUsage{})
 	// cert, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("Create Certificate failed (%v)", err)
 	// }
-	csrPem, err := encodePem(true, csrBytes, privKey)
+	csrPem, err := encodePem(true, csrBytes)
 	return csrPem, err
 }
 
@@ -256,11 +272,13 @@ func (sc *SecretManager) CreateNewCertificate(csrPEM []byte, duration time.Durat
 	if err != nil {
 		return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
 	}
-	cert, err = x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)
+	// parent, err := x509.ParseCertificate(sc.cache.rootCert)
+	certPem, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)
 	if err != nil {
 		return nil, fmt.Errorf("Create Certificate failed (%v)", err)
 	}
-	log.Info("DEBUG: Cert generated: ", cert)
+	cert, err = encodePem(false, certPem)
+	// log.Info("DEBUG: Cert generated: ", cert)
 	return cert, err
 }
 
@@ -362,7 +380,7 @@ func GenCertTemplate(csrPEM []byte, duration time.Duration, isCA bool, keyUsage 
 	}, nil
 }
 
-func encodePem(isCSR bool, csrOrCert []byte, priv interface{}) (
+func encodePem(isCSR bool, csrOrCert []byte) (
 	csrOrCertPem []byte, err error) {
 	encodeMsg := "CERTIFICATE"
 	if isCSR {
@@ -371,4 +389,42 @@ func encodePem(isCSR bool, csrOrCert []byte, priv interface{}) (
 	csrOrCertPem = pem.EncodeToMemory(&pem.Block{Type: encodeMsg, Bytes: csrOrCert})
 	err = nil
 	return
+}
+
+// newCACertificate returns a self-signed certificate used as certificate authority
+func newCACertificate(key crypto.Signer) ([]byte, error) {
+	max := new(big.Int).SetInt64(math.MaxInt64)
+	serial, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return nil, err
+	}
+	tmpl := &x509.Certificate{
+		Version:               tls.VersionTLS12,
+		SerialNumber:          serial,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365).UTC(),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		Subject: pkix.Name{
+			CommonName:   "SGX self-signed root certificate authority",
+			Organization: []string{"Intel(R) Corporation"},
+		},
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
+	// *tmpl = x509.Certificate{}
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// cert, err := x509.ParseCertificate(certBytes)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// runtime.SetFinalizer(cert, func(c *x509.Certificate) {
+	// 	*c = x509.Certificate{}
+	// })
+
+	return certBytes, nil
 }
