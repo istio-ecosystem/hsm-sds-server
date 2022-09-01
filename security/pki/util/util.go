@@ -10,8 +10,6 @@ import (
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
 )
 
-// "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/sds"
-
 func NewSecretManager(options *security.CertOptions) *security.SecretManager {
 	st := &security.SecretManager{
 		Name:          "SecretManager for SDS Server",

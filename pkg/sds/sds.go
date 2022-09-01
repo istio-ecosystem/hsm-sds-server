@@ -54,20 +54,13 @@ func newSDSService() *sdsservice {
 	return ret
 }
 
-// register adds the SDS handle to the grpc server
-// func (s *sdsservice) register(rpcs *grpc.Server) {
-// 	sdsv3.RegisterSecretDiscoveryServiceServer(rpcs, s)
-// }
-
 func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSecretsServer) error {
 	// TODO: Authenticate the stream context before handle it
-	// identitys, err := s.Authenticate(stream.Context())
 	log.Info("DEBUG 6: StreamSecret called")
 	errch := make(chan error, 1)
 	go func() {
 		for {
 			req, err := stream.Recv()
-			// log.Info("DEBUG 5 Request: ", req)
 			if err != nil {
 				if status.Code(err) == codes.Canceled || errors.Is(err, io.EOF) {
 					err = nil
@@ -151,7 +144,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		} else {
 			conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
 				SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
-				KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
+				KeyLabel:   resourceName,
 				UsrPin:     s.st.SgxConfigs.HSMUserPin,
 				SoPin:      s.st.SgxConfigs.HSMSoPin,
 				TokenLabel: s.st.SgxConfigs.HSMTokenLabel,

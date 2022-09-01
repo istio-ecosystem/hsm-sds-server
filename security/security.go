@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
-	// "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security/pki/util"
 	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 )
@@ -199,13 +198,6 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 }
 
 func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, error) {
-	// if options.IsCA {
-	// 	// TODO: find RootCert
-	// 	if rootcert, err := sc.getCacheRootCert(); rootcert != nil {
-	// 		log.Info("Find root cert in secret cache")
-	// 		return rootcert, err
-	// 	}
-	// }
 
 	csrHostName := &SPIFFEIdentity{
 		TrustDomain:    TrustDomain,
@@ -234,13 +226,6 @@ func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("CSR creation failed (%v)", err)
 	}
-	// log.Info("DEBUG csrBytes:", csrBytes)
-	// certTemplate, _ := GenCertTemplate(csrBytes, time.Hour*24, false, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
-	// 	[]x509.ExtKeyUsage{})
-	// cert, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("Create Certificate failed (%v)", err)
-	// }
 	csrPem, err := encodePem(true, csrBytes)
 	return csrPem, err
 }
@@ -273,7 +258,6 @@ func (sc *SecretManager) CreateNewCertificate(csrPEM []byte, duration time.Durat
 		return nil, fmt.Errorf("Create Certificate failed (%v)", err)
 	}
 	cert, err = encodePem(false, certPem)
-	// log.Info("DEBUG: Cert generated: ", cert)
 	return cert, err
 }
 
@@ -338,7 +322,6 @@ func GenCertTemplate(csrPEM []byte, duration time.Duration, isCA bool, keyUsage 
 	block, _ := pem.Decode(csrPEM)
 	if block == nil {
 		return nil, errors.New("failed to decode csr")
-		// log.Info(err)
 	}
 
 	csr, err := x509.ParseCertificateRequest(block.Bytes)
@@ -406,20 +389,7 @@ func newCACertificate(key crypto.Signer) ([]byte, error) {
 			Organization: []string{"Intel(R) Corporation"},
 		},
 	}
-	certBytes, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
-	// *tmpl = x509.Certificate{}
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// cert, err := x509.ParseCertificate(certBytes)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// runtime.SetFinalizer(cert, func(c *x509.Certificate) {
-	// 	*c = x509.Certificate{}
-	// })
+	certBytes, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
 
 	return certBytes, nil
 }
