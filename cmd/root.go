@@ -5,9 +5,10 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/sds"
 	"github.com/spf13/cobra"
 	"istio.io/pkg/log"
+
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/sds"
 )
 
 func NewRootCommand() *cobra.Command {
@@ -26,12 +27,12 @@ func NewRootCommand() *cobra.Command {
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			log.Info("Start the Secret Discovery Service back by Intel SGX......")
-			mTLSServer := sds.NewServer()
-			if mTLSServer == nil {
-				return fmt.Errorf("failed to create mTLS SDS grpc server!")
+			sdsServer := sds.NewServer()
+			if sdsServer == nil {
+				return fmt.Errorf("failed to create SDS grpc server!")
 			}
-			mTLSErr := mTLSServer.StartmTLSSDSService(context.Background())
-			return mTLSErr
+			err := sdsServer.Start(context.Background())
+			return err
 		},
 	}
 

@@ -9,24 +9,23 @@ import (
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 	"istio.io/pkg/log"
-
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
+
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security/pki/util"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/anypb"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security/pki/util"
 )
 
 type sdsservice struct {
 	st *security.SecretManager
-
 	stop   chan struct{}
 	reqch  chan *discovery.DiscoveryRequest
 	respch chan *discovery.DiscoveryResponse
@@ -34,28 +33,29 @@ type sdsservice struct {
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
 func newSDSService() *sdsservice {
-	log.Info("DEBUG 2: starting sdsservice")
-	ret := &sdsservice{
-		stop:   make(chan struct{}),
-		reqch:  make(chan *discovery.DiscoveryRequest, 1),
-		respch: make(chan *discovery.DiscoveryResponse, 1),
-	}
-
+	log.Info("starting sds service")
+	var sdsSvc *sdsservice
 	options := security.CertOptions{
-		// Host:       csrHost.String(),
 		IsCA:       false,
 		TTL:        time.Hour * 24,
 		NotBefore:  time.Now(),
 		RSAKeySize: security.DefaultRSAKeysize,
 	}
-
-	ret.st = util.NewSecretManager(&options)
-
-	return ret
+	st, err := util.NewSecretManager(&options)
+	if st != nil && err == nil {
+		sdsSvc = &sdsservice{
+			stop:   make(chan struct{}),
+			reqch:  make(chan *discovery.DiscoveryRequest, 1),
+			respch: make(chan *discovery.DiscoveryResponse, 1),
+		}
+		sdsSvc.st = st
+	}
+	return sdsSvc
 }
 
 func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSecretsServer) error {
 	// TODO: Authenticate the stream context before handle it
+	// identitys, err := s.Authenticate(stream.Context())
 	log.Info("DEBUG 6: StreamSecret called")
 	errch := make(chan error, 1)
 	go func() {
@@ -75,16 +75,18 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 	for {
 		select {
 		case newReq := <-s.reqch:
+			s.st.SgxctxLock.Lock()
 			if s.st.SgxContext == nil {
 				s.st.SgxContext, _ = sgx.NewContext(sgx.Config{
-					HSMTokenLabel: sgx.HSMTokenLabel,
-					HSMUserPin:    sgx.HSMUserPin,
-					HSMSoPin:      sgx.HSMSoPin,
-					HSMConfigPath: sgx.SgxLibrary,
-					HSMKeyLabel:   sgx.DefaultKeyLabel,
-					HSMKeyType:    sgx.HSMKeyType,
+					HSMTokenLabel:   sgx.HSMTokenLabel,
+					HSMUserPin:      sgx.HSMUserPin,
+					HSMSoPin:        sgx.HSMSoPin,
+					HSMConfigPath:   sgx.SgxLibrary,
+					HSMKeyLabel:     sgx.HSMKeyLabel,
+					HSMKeyType:      sgx.HSMKeyType,
 				})
 			}
+			s.st.SgxctxLock.Unlock()
 			lastReq = newReq
 		case err := <-errch:
 			return err
@@ -126,7 +128,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		// Register the Certificate
 		cert, err := s.st.GenerateSecret(resourceName)
 		if err != nil {
-			return nil, fmt.Errorf("SDS: failed Create Certificate:  %v", err)
+			return nil, fmt.Errorf("failed Create Certificate %v", err)
 		}
 		secret := &tlsv3.Secret{
 			Name: resourceName,
@@ -144,7 +146,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		} else {
 			conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
 				SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
-				KeyLabel:   resourceName,
+				KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
 				UsrPin:     s.st.SgxConfigs.HSMUserPin,
 				SoPin:      s.st.SgxConfigs.HSMSoPin,
 				TokenLabel: s.st.SgxConfigs.HSMTokenLabel,

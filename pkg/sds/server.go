@@ -11,7 +11,7 @@ import (
 
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 )
 
 const (
@@ -27,25 +27,22 @@ type Server struct {
 	grpcWorkloadServer   *grpc.Server
 	stopped              *atomic.Bool
 	errChan              chan error
-	newSDSv3Server       func() sdsv3.SecretDiscoveryServiceServer
 }
 
-// SDSserver bootstrap sequence:
-// First step: implement sdsservice as envoy sdsv3.SecretDiscoveryServiceServer interface,
-// which cotain request channel as Discovery Request,
-// response channel as Discovery response, err channel etc.
-// Secret manager for generate CSR, may need an Attestator for stream attestation
-// Second step: boot strap grpc server: setup grpc server, create uds listener, and let the server
-// serves in this socket path
+// NewServer implements SDS service as envoy sdsv3.SecretDiscoveryServiceServer interface
+// SDS service will create Secret manager and generate `default` private key and cert in SGX
+// SDS service contains a request channel as Discovery Request,
+// a response channel as Discovery response and an err channel.
 func NewServer() *Server {
-	s := &Server{
-		stopped: atomic.NewBool(false),
-		errChan: make(chan error),
+	var s *Server
+	sdsService := newSDSService()
+	if sdsService != nil {
+		s = &Server{
+			stopped: atomic.NewBool(false),
+			errChan: make(chan error),
+		}
+		s.workloadSds = sdsService
 	}
-	s.newSDSv3Server = func() sdsv3.SecretDiscoveryServiceServer {
-		return newSDSService()
-	}
-	s.workloadSds = s.newSDSv3Server()
 	return s
 }
 
@@ -63,7 +60,7 @@ func (s *Server) Stop() {
 	}
 }
 
-func (s *Server) StartmTLSSDSService(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context) error {
 	s.grpcWorkloadServer = grpc.NewServer(s.grpcServerOptions()...)
 	sdsv3.RegisterSecretDiscoveryServiceServer(s.grpcWorkloadServer, s.workloadSds)
 	var err error
@@ -73,20 +70,19 @@ func (s *Server) StartmTLSSDSService(ctx context.Context) error {
 		return err
 	}
 	log.Info("Starting mTLS SDS grpc server")
-	log.Info("DEBUG 4: Listener addr: ", s.grpcWorkloadListener.Addr())
+	log.Debugf("mTLS Listener addr: ", s.grpcWorkloadListener.Addr())
 	if s.grpcWorkloadListener == nil {
 		if s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath); err != nil {
 			log.Info("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
 		}
 	}
 	go func() {
-		log.Info("DEBUG: Call go routine")
 		s.errChan <- s.grpcWorkloadServer.Serve(s.grpcWorkloadListener)
 	}()
 
 	select {
 	case err = <-s.errChan:
-		log.Warnf("SDS grpc server for workload proxies failed to start: ", err)
+		log.Warnf("SDS grpc server for workload proxies failed to run: ", err)
 	case <-ctx.Done():
 		log.Info("Stopping Workload and SDS APIs")
 		err = <-s.errChan
@@ -94,11 +90,6 @@ func (s *Server) StartmTLSSDSService(ctx context.Context) error {
 			err = nil
 		}
 	}
-
-	if err = <-s.errChan; err != nil {
-		log.Infof("DEBUG error:", err)
-	}
-	log.Info("DEBUG 1: ", s.workloadSds)
 	return nil
 }
 

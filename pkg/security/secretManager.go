@@ -15,9 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"istio.io/pkg/env"
 	"istio.io/pkg/log"
+
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 )
 
 const (
@@ -33,6 +34,7 @@ type SecretManager struct {
 	ConfigOptions *CertOptions
 	SgxConfigs    *sgx.Config
 	SgxContext    *sgx.SgxContext
+	SgxctxLock    sync.Mutex
 	cache         *secretCache
 }
 

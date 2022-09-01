@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"istio.io/pkg/log"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/security"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 )
 
 const (
