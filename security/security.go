@@ -3,6 +3,7 @@ package security
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -169,14 +170,8 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 		// 	log.Info("Find root cert in secret cache")
 		// 	return cert, err
 		// }
-		cryptoctx, err := sc.SgxContext.GetCryptoContext()
-		if err != nil {
-			return nil, fmt.Errorf("failed find crypto11 context: %v", err)
-		}
-		privKey, err := cryptoctx.FindKeyPair(nil, []byte(sc.SgxConfigs.HSMKeyLabel))
-		if err != nil {
-			return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
-		}
+		privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+
 		certByte, err := newCACertificate(privKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed generate root cert: %v", err)
@@ -196,7 +191,7 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 		cert, err = sc.CreateNewCertificate(csrBytes, time.Hour*240, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
 			[]x509.ExtKeyUsage{})
 		if err != nil {
-			return nil, fmt.Errorf("failed Create Certificate %v", err)
+			return nil, fmt.Errorf("failed Create New Certificate: %v", err)
 		}
 	}
 	// sc.registerSecret(isCA, cert)
@@ -233,7 +228,7 @@ func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, error) {
 	}
 	privKey, err = cryptoctx.FindKeyPair(nil, []byte(sc.SgxConfigs.HSMKeyLabel))
 	if err != nil {
-		return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
+		return nil, fmt.Errorf("GenerateK8sCSR: failed find crypto11 private key: %v", err)
 	}
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, template, privKey)
 	if err != nil {
@@ -270,7 +265,7 @@ func (sc *SecretManager) CreateNewCertificate(csrPEM []byte, duration time.Durat
 	}
 	privKey, err = cryptoctx.FindKeyPair(nil, []byte(sc.SgxConfigs.HSMKeyLabel))
 	if err != nil {
-		return nil, fmt.Errorf("failed find crypto11 private key: %v", err)
+		return nil, fmt.Errorf("CreateNewCertificate: failed find crypto11 private key: %v", err)
 	}
 	// parent, err := x509.ParseCertificate(sc.cache.rootCert)
 	certPem, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, privKey.Public(), privKey)

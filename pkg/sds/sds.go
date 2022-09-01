@@ -133,7 +133,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		// Register the Certificate
 		cert, err := s.st.GenerateSecret(resourceName)
 		if err != nil {
-			return nil, fmt.Errorf("failed Create Certificate %v", err)
+			return nil, fmt.Errorf("SDS: failed Create Certificate:  %v", err)
 		}
 		secret := &tlsv3.Secret{
 			Name: resourceName,
