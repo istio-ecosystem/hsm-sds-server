@@ -33,9 +33,9 @@ type Server struct {
 // SDS service will create Secret manager and generate `default` private key and cert in SGX
 // SDS service contains a request channel as Discovery Request,
 // a response channel as Discovery response and an err channel.
-func NewServer() *Server {
+func NewServer(kubeconfig, configContext string) *Server {
 	var s *Server
-	sdsService := newSDSService()
+	sdsService := newSDSService(kubeconfig, configContext)
 	if sdsService != nil {
 		s = &Server{
 			stopped: atomic.NewBool(false),

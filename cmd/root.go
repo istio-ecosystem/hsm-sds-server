@@ -11,6 +11,11 @@ import (
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/sds"
 )
 
+var (
+	kubeconfig    string
+	configContext string
+)
+
 func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:          "sds-server",
@@ -27,7 +32,7 @@ func NewRootCommand() *cobra.Command {
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			log.Info("Start the Secret Discovery Service back by Intel SGX......")
-			sdsServer := sds.NewServer()
+			sdsServer := sds.NewServer(kubeconfig, configContext)
 			if sdsServer == nil {
 				return fmt.Errorf("failed to create SDS grpc server!")
 			}
@@ -36,6 +41,12 @@ func NewRootCommand() *cobra.Command {
 		},
 	}
 
+	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
+		"Kubernetes configuration file")
+	rootCmd.PersistentFlags().StringVar(&configContext, "context", "",
+		"The name of the kubeconfig context to use")
+
+	addFlags(rootCmd)
 	addFlags(waitCmd)
 	rootCmd.AddCommand(waitCmd)
 	return rootCmd

@@ -6,6 +6,33 @@ spec:
   # profile: minimal
   # hub: "istio"
   # tag: "latest"
+  meshConfig:
+    defaultConfig:
+      proxyMetadata:
+        ISTIO_META_CERT_SIGNER: istio-system
+    caCertificates:
+      - pem: |
+          -----BEGIN CERTIFICATE-----
+          MIIDFDCCAfygAwIBAgIRAMK/k/OwEAJEa45NOEw5etkwDQYJKoZIhvcNAQELBQAw
+          FzEVMBMGA1UEAxMMaXN0aW8tc3lzdGVtMB4XDTIxMTIxMDA3NDg0MVoXDTIyMDMx
+          MDA3NDg0MVowFzEVMBMGA1UEAxMMaXN0aW8tc3lzdGVtMIIBIjANBgkqhkiG9w0B
+          AQEFAAOCAQ8AMIIBCgKCAQEAzv5KU6gvuWZnRvAtg6IHakT/YL5Cwvm5esemqTh/
+          e4kI8dYOQRuD8B1nZ/eZY4iljbSUpeceV9K2/PQpbSECouDWbCzYH3v/cxUSk7za
+          nLfrHRBXyA25dIIWDr/yKkmwWBJQHwWQAmKDANOlJic30Ki5AzAUIHQpFodErLSD
+          L0M1dUVHhWB2erIGKZRzvB1AuzsQLORZY4I/W8zpLFs96L4ecjfBqTTNzcFoa4qK
+          lrkkx0iduL1YloeLgIzHy6spzVRCVpdQ0RctPfcspR+YW0Nfgsy5GR6+adWYQp3V
+          pBsloooSLG//30X7mmHi5yoAAmzNl9qiSzqB3M8fAVmPxQIDAQABo1swWTAOBgNV
+          HQ8BAf8EBAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUkXJ5NmCrDEl9
+          O1L7jjXa7Ide5gUwFwYDVR0RBBAwDoIMaXN0aW8tc3lzdGVtMA0GCSqGSIb3DQEB
+          CwUAA4IBAQB0/FMAg/Bf1mEaBbN14jLUHtHjnyeSd2fnLby1Yg79CIdQ0ffaWGJA
+          6LA4G2DXYxScOBcoxokujx7mCHlHwHg6UxOsiTH7DlqjhIAn2dRt1A1WH9vOvQ5r
+          j5TbvJeF9xgofRotIMeqTLtM3Ozcho2Yv5pqWyWJJkjTdkHuop0Q5jl8lDhF4rh1
+          DAJwkDiUs0TtePeVeTaG6+28XOSz/WFqk7vCUJrRXU+nBH9nmRURLdfFJpirviZv
+          LVDhhkjYP9dYARfl6lPN0CjuwvwkTsjCR3QUaJkHqG1qUb2RNGh6L4dIbvX8QKH1
+          sZFKWfif1FC6pr1GLToH4L2s4zrD/u4Q
+          -----END CERTIFICATE-----
+        certSigners:
+        - clusterissuers.cert-manager.io/istio-system
   values:
     global:
       imagePullPolicy: IfNotPresent

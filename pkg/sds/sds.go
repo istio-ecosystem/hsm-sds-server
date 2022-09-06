@@ -5,14 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
+
+	meshconfig "istio.io/api/mesh/v1alpha1"
+	"istio.io/istio/pkg/config/mesh"
+	"istio.io/pkg/log"
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
-	"istio.io/pkg/log"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -20,8 +28,18 @@ import (
 
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security/pki/util"
+)
+
+const (
+	configMapKey             = "mesh"
+	injectConfigMapKey       = "config"
+	valuesConfigMapKey       = "values"
+	istioNamespace           = "istio-system"
+	defaultMeshConfigMapName = "istio"
+	certSignerEnv            = "ISTIO_META_CERT_SIGNER"
 )
 
 type sdsservice struct {
@@ -29,10 +47,11 @@ type sdsservice struct {
 	stop   chan struct{}
 	reqch  chan *discovery.DiscoveryRequest
 	respch chan *discovery.DiscoveryResponse
+	sdsClient kube.Client
 }
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
-func newSDSService() *sdsservice {
+func newSDSService(kubeconfig, configContext string) *sdsservice {
 	log.Info("starting sds service")
 	var sdsSvc *sdsservice
 	options := security.CertOptions{
@@ -50,6 +69,19 @@ func newSDSService() *sdsservice {
 		}
 		sdsSvc.st = st
 	}
+
+	if err := sdsSvc.initSDSClient(kubeconfig, configContext); err != nil {
+		log.Info("DEBUG initSDSClient: init kube SDS client error: ", err)
+	}
+
+	// TODO get cert-signer from proxyconfig 
+	// sds server fetch the certificate from Istio configmap by default
+	caCert, err := sdsSvc.getMatchedCertificates("", "", "")
+	if err != nil {
+		log.Infof("DEBUG Handle CA certificates: %v", err)
+	}
+	log.Infof("Get the CA certificate: %v", caCert)
+
 	return sdsSvc
 }
 
@@ -180,6 +212,89 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 
 	log.Info("DEBUG SDS Resp: ", resp)
 	return resp, nil
+}
+
+// initSDSClient create a default sds kube-istio client
+func (s *sdsservice) initSDSClient(kubeconfig, configContext string) error {
+	kubeRestConfig, err := kube.DefaultRestConfig(kubeconfig, configContext, func(config *rest.Config) {
+		config.QPS = 50
+		config.Burst = 100
+	})
+	if err != nil {
+		return fmt.Errorf("failed creating kube config: %v", err)
+	}
+	s.sdsClient, err = kube.NewSDSClient(kube.NewClientConfigForRestConfig(kubeRestConfig))
+	if err != nil {
+		return fmt.Errorf("failed creating kube client: %v", err)
+	}
+	return nil
+}
+
+// GetMatchedCertificates will return the matched certificate data defined in mesh configmap
+func (s *sdsservice) getMatchedCertificates(meshConfigMapName, revision string, certSigner string) (*meshconfig.MeshConfig_CertificateData, error) {
+	// if there is no specified certificates signer, will fetch it from Istio configmap
+	if certSigner == "" {
+		meshConf, err := s.getMeshConfigFromConfigMap(meshConfigMapName, revision)
+		if err != nil {
+			return nil, err
+		}
+		// Fetch the cert signer from Istio configmap
+		var certSigner string
+		if meshConf != nil {
+			defaultConf := meshConf.GetDefaultConfig()
+			if defaultConf != nil {
+				certSigner = defaultConf.GetProxyMetadata()[certSignerEnv]
+			}
+		}
+		// Set the cert signer as istio namespace
+		if certSigner == "" {
+			certSigner = istioNamespace
+		}
+		if meshConf != nil && len(meshConf.CaCertificates) > 0 {
+			for _, caCert := range meshConf.CaCertificates {
+				for _, signerName := range caCert.CertSigners {
+					signers := strings.Split(signerName, "/")
+					signer := signers[len(signers) - 1]
+					if certSigner == signer {
+						return caCert, nil
+					}
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("cannot get the matched CA certificate with specified ISTIO_META_CERT_SIGNER: %v", certSignerEnv)
+}
+
+// getMeshConfigFromConfigMap will return the istio mesh configmap via kube client
+func (s *sdsservice) getMeshConfigFromConfigMap(meshConfigMapName, revision string) (*meshconfig.MeshConfig, error) {
+	if meshConfigMapName == "" {
+		meshConfigMapName = defaultMeshConfigMapName
+	}
+	if meshConfigMapName == defaultMeshConfigMapName && revision != "" {
+		meshConfigMapName = fmt.Sprintf("%s-%s", defaultMeshConfigMapName, revision)
+	}
+
+	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	log.Infof("getMeshConfigFromConfigMap KUBERNETES_SERVICE_HOST: %v, KUBERNETES_SERVICE_PORT: %v", host, port)
+
+	meshConfigMap, err := s.sdsClient.Kube().CoreV1().ConfigMaps(istioNamespace).Get(context.TODO(), meshConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not read valid configmap %q from namespace %q: %v - "+
+			"please ensure valid MeshConfig exists!",
+			meshConfigMapName, istioNamespace, err)
+	}
+
+	configYaml, exists := meshConfigMap.Data[configMapKey]
+	if !exists {
+		return nil, fmt.Errorf("missing configuration map key %q", configMapKey)
+	}
+	cfg, err := mesh.ApplyMeshConfigDefaults(configYaml)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse mesh config based on yaml [%v]", configYaml)
+	}
+
+	return cfg, nil
 }
 
 // MessageToAny converts from proto message to proto Any
