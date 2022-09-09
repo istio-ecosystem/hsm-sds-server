@@ -59,6 +59,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math"
@@ -67,6 +68,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/go-logr/logr"
@@ -84,7 +86,7 @@ const (
 	DefaultHSMSoPin            = "HSMSoPin"
 	DefaultHSMUserPin          = "HSMUserPin"
 	DefaultHSMKeyType          = "rsa"
-	RSAKeySize                 = 3072
+	DefaultRSAKeySize          = 3072
 	EnclaveQuoteKeyObjectLabel = "Enclave Quote"
 )
 
@@ -125,9 +127,9 @@ type SgxContext struct {
 	// generated quote
 	ctkQuote []byte
 
-	cryptoCtx *crypto11.Context
-	ctxLock   sync.Mutex
-	cfg       *Config
+	cryptoCtx     *crypto11.Context
+	cryptoCtxLock sync.Mutex
+	cfg           *Config
 	// k8sClient client.Client
 	// signers   *signer.SignerMap
 	qaCounter uint64
@@ -226,8 +228,8 @@ func (ctx *SgxContext) GetConfig() (*Config, error) {
 }
 
 func (ctx *SgxContext) destroyP11Context() {
-	ctx.ctxLock.Lock()
-	defer ctx.ctxLock.Unlock()
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
 	if ctx.p11Ctx != nil {
 		ctx.p11Ctx.Logout(ctx.p11Session)
 		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.quotePrvKey)
@@ -239,8 +241,8 @@ func (ctx *SgxContext) destroyP11Context() {
 }
 
 func (ctx *SgxContext) destroyCryptoContext() {
-	ctx.ctxLock.Lock()
-	defer ctx.ctxLock.Unlock()
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
 	if ctx.cryptoCtx != nil {
 		ctx.cryptoCtx.Close()
 		ctx.cryptoCtx = nil
@@ -250,8 +252,8 @@ func (ctx *SgxContext) destroyCryptoContext() {
 func (ctx *SgxContext) reloadCryptoContext() error {
 	ctx.destroyCryptoContext()
 
-	ctx.ctxLock.Lock()
-	defer ctx.ctxLock.Unlock()
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
 
 	cryptoCtx, err := crypto11.Configure(&crypto11.Config{
 		Path:       SgxLibrary,
@@ -327,7 +329,7 @@ func generateP11KeyPair(p11Ctx *pkcs11.Ctx, p11Session pkcs11.SessionHandle) (pk
 		pkcs11.NewAttribute(pkcs11.CKA_ENCRYPT, true),
 		pkcs11.NewAttribute(pkcs11.CKA_VERIFY, true),
 		pkcs11.NewAttribute(pkcs11.CKA_WRAP, true),
-		pkcs11.NewAttribute(pkcs11.CKA_MODULUS_BITS, RSAKeySize),
+		pkcs11.NewAttribute(pkcs11.CKA_MODULUS_BITS, DefaultRSAKeySize),
 		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_RSA),
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
 		pkcs11.NewAttribute(pkcs11.CKA_LABEL, EnclaveQuoteKeyObjectLabel),
@@ -400,8 +402,8 @@ func newCACertificate(key crypto.Signer) (*x509.Certificate, error) {
 }
 
 func (ctx *SgxContext) InitializeKey(keyLabel, keyAlgo string, keySize int) error {
-	ctx.ctxLock.Lock()
-	defer ctx.ctxLock.Unlock()
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
 
 	reader, err := ctx.cryptoCtx.NewRandomReader()
 	if err != nil {
@@ -447,5 +449,128 @@ func (ctx *SgxContext) InitializeKey(keyLabel, keyAlgo string, keySize int) erro
 
 	ctx.log.Info("Crypto Keypair generated")
 	log.Info("SGX: Crypto Keypair generated")
+	return nil
+}
+
+func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
+	pub, priv, err := generateP11KeyPair(ctx.p11Ctx, ctx.p11Session)
+	if err != nil {
+		ctx.Destroy()
+		return fmt.Errorf("call to generateP11KeyPair failed %s", err)
+	}
+	ctx.quotePubKey = pub
+	ctx.quotePrvKey = priv
+
+	quote, err := generateQuote(ctx.p11Ctx, ctx.p11Session, pub)
+	//quote := []byte("aaaa")
+	if err != nil {
+		ctx.p11Ctx.Destroy()
+		return fmt.Errorf("call to generateQuote failed %s", err)
+	}
+	ctx.ctkQuote = quote
+	return nil
+}
+func generateQuote(p11Ctx *pkcs11.Ctx, p11Session pkcs11.SessionHandle, pubKey pkcs11.ObjectHandle) ([]byte, error) {
+	// Wrap the key
+	quoteParams := C.CK_ECDSA_QUOTE_RSA_PUBLIC_KEY_PARAMS{
+		qlPolicy: C.SGX_QL_PERSISTENT,
+	}
+	for i := 0; i < C.NONCE_LENGTH; i++ {
+		quoteParams.nonce[i] = C.CK_BYTE(i)
+	}
+
+	params := C.GoBytes(unsafe.Pointer(&quoteParams), C.int(unsafe.Sizeof(quoteParams)))
+	m := pkcs11.NewMechanism(C.CKM_EXPORT_ECDSA_QUOTE_RSA_PUBLIC_KEY, params)
+
+	//	l.V(3).Info("Wrapping key....")
+	quotePubKey, err := p11Ctx.WrapKey(p11Session, []*pkcs11.Mechanism{m}, pkcs11.ObjectHandle(0), pubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	offset := int(C.quote_offset(*(*C.CK_BYTE_PTR)(unsafe.Pointer(&quotePubKey))))
+	return quotePubKey[offset:], nil
+}
+
+// This method should be called on reply getting from key-manager
+// after successful quote validation.
+func (ctx *SgxContext) ProvisionKey(signerName string, base64Data []byte) error {
+	decodedData, err := base64.StdEncoding.DecodeString(string(base64Data))
+	if err != nil {
+		return fmt.Errorf("corrupted key data: %v", err)
+	}
+
+	// Wrapped SWK - AES256 (with input public key) + Wrapped input private key (with SWK),
+	// bytes concatenated and then encoded with base64 - After decoding with base64,
+	// the first 384 bytes (3072 bits - it depends on the length of the input public key)
+	// is SWK key (AES), the rest is a wrapped private key in PKCS#8 format
+	wrappedSwk := decodedData[:DefaultRSAKeySize/8]
+	wrappedPrKey := decodedData[DefaultRSAKeySize/8:]
+
+	return ctx.provisionKey(signerName, wrappedSwk, wrappedPrKey)
+}
+
+func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedKey []byte) error {
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
+
+	pCtx := ctx.p11Ctx
+	attributeSWK := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_SECRET_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_AES),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, false),
+		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, false),
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, false),
+	}
+
+	rsaPkcsOaepMech := pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, pkcs11.NewOAEPParams(pkcs11.CKM_SHA_1, pkcs11.CKG_MGF1_SHA1, pkcs11.CKZ_DATA_SPECIFIED, nil))
+	swkHandle, err := pCtx.UnwrapKey(ctx.p11Session, []*pkcs11.Mechanism{rsaPkcsOaepMech}, ctx.quotePrvKey, wrappedSWK, attributeSWK)
+	if err != nil {
+		return fmt.Errorf("failed to unwrap symmetric wrapping key: %v", err)
+	}
+
+	ctx.log.Info("Unwrapped SWK Key successfully")
+
+	keyID, err := generateKeyID(rand.Reader, 16)
+	attributeWPK := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_RSA),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, keyLabel),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_PRIVATE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_DECRYPT, true),
+		pkcs11.NewAttribute(pkcs11.CKA_SIGN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_UNWRAP, false),
+		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, false),
+		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
+	}
+	aesKeyWrapMech := pkcs11.NewMechanism(pkcs11.CKM_AES_KEY_WRAP_PAD, nil)
+	prvKey, err := pCtx.UnwrapKey(ctx.p11Session, []*pkcs11.Mechanism{aesKeyWrapMech}, swkHandle, wrappedKey, attributeWPK)
+	if err != nil {
+		return fmt.Errorf("failed to unwrap private key: %v", err)
+	}
+	ctx.log.Info("Unwrapped PWK Key successfully")
+
+	template := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, nil),
+		pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
+		pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),
+	}
+	publicKeyAttrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, prvKey, template)
+	if err != nil {
+		ctx.log.Info("Failed to fetch public attributes: %v", err)
+	}
+	publicKeyAttrs = append(publicKeyAttrs, []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, keyLabel),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
+	}...)
+	if _, err := ctx.p11Ctx.CreateObject(ctx.p11Session, publicKeyAttrs); err != nil {
+		ctx.log.Info("Failed to add public key object", "error", err)
+	}
+	ctx.log.Info("Unwrapped Public Key successfully")
+
 	return nil
 }

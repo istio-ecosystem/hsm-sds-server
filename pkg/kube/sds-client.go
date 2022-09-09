@@ -32,6 +32,10 @@ import (
 	istioinformer "istio.io/client-go/pkg/informers/externalversions"
 	"istio.io/istio/operator/pkg/apis"
 	"istio.io/istio/pkg/kube/mcs"
+
+	tcsapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
+	tcsv1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
+	qaapiinformer "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions"
 )
 
 type Client interface {
@@ -92,6 +96,9 @@ type SdsClient struct {
 	// If enable, will wait for cache syncs with extremely short delay. This should be used only for tests
 	fastSync               bool
 	informerWatchesPending *atomic.Int32
+
+	qaapi            tcsv1alpha1.Interface
+	qaInformer       qaapiinformer.SharedInformerFactory
 }
 
 // NewSDSClient creates a Kubernetes client from the given rest config.
@@ -137,6 +144,13 @@ func newSDSClientInternal(clientFactory *clientFactory, revision string) (*SdsCl
 		return nil, err
 	}
 	c.extInformer = kubeExtInformers.NewSharedInformerFactory(c.extSet, resyncInterval)
+
+	c.qaapi , err = tcsv1alpha1.NewForConfig(c.config)
+	if err != nil {
+		return nil, err
+	}
+	c.qaInformer = qaapiinformer.NewSharedInformerFactory(c.qaapi, resyncInterval)
+
 
 	return &c, nil
 }
@@ -187,6 +201,13 @@ func (c *SdsClient) ExtInformer() kubeExtInformers.SharedInformerFactory {
 	return c.extInformer
 }
 
+func (c *SdsClient) QaAPIInformer() qaapiinformer.SharedInformerFactory {
+	return c.qaInformer
+}
+func (c *SdsClient) QaAPI() tcsv1alpha1.Interface{
+	return c.qaapi
+}
+
 // RunAndWait starts all informers and waits for their caches to sync.
 // Warning: this must be called AFTER .Informer() is called, which will register the informer.
 func (c *SdsClient) RunAndWait(stop <-chan struct{}) {
@@ -194,6 +215,7 @@ func (c *SdsClient) RunAndWait(stop <-chan struct{}) {
 	c.istioInformer.Start(stop)
 	c.gatewayapiInformer.Start(stop)
 	c.extInformer.Start(stop)
+	c.qaInformer.Start(stop)
 	if c.fastSync {
 		// WaitForCacheSync will virtually never be synced on the first call, as its called immediately after Start()
 		// This triggers a 100ms delay per call, which is often called 2-3 times in a test, delaying tests.
@@ -202,6 +224,7 @@ func (c *SdsClient) RunAndWait(stop <-chan struct{}) {
 		fastWaitForCacheSync(stop, c.istioInformer)
 		fastWaitForCacheSync(stop, c.gatewayapiInformer)
 		fastWaitForCacheSync(stop, c.extInformer)
+		fastWaitForCacheSync(stop, c.qaInformer)
 		_ = wait.PollImmediate(time.Microsecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 			select {
 			case <-stop:
@@ -218,6 +241,7 @@ func (c *SdsClient) RunAndWait(stop <-chan struct{}) {
 		c.istioInformer.WaitForCacheSync(stop)
 		c.gatewayapiInformer.WaitForCacheSync(stop)
 		c.extInformer.WaitForCacheSync(stop)
+		c.qaInformer.WaitForCacheSync(stop)
 	}
 }
 
@@ -261,5 +285,6 @@ func istioScheme() *runtime.Scheme {
 	utilruntime.Must(gatewayapibeta.AddToScheme(scheme))
 	utilruntime.Must(apis.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(tcsapi.AddToScheme(scheme))
 	return scheme
 }
