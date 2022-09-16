@@ -16,15 +16,15 @@ import (
 	"istio.io/istio/pkg/config/mesh"
 	"istio.io/pkg/log"
 
-	"google.golang.org/protobuf/encoding/prototext"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/anypb"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
@@ -43,10 +43,11 @@ const (
 )
 
 type sdsservice struct {
-	st *security.SecretManager
-	stop   chan struct{}
-	reqch  chan *discovery.DiscoveryRequest
-	respch chan *discovery.DiscoveryResponse
+	st        *security.SecretManager
+	stop      chan struct{}
+	reqch     chan *discovery.DiscoveryRequest
+	respch    chan *discovery.DiscoveryResponse
+	pushch    chan *discovery.Resource
 	sdsClient kube.Client
 }
 
@@ -66,6 +67,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 			stop:   make(chan struct{}),
 			reqch:  make(chan *discovery.DiscoveryRequest, 1),
 			respch: make(chan *discovery.DiscoveryResponse, 1),
+			pushch: make(chan *discovery.Resource, 1),
 		}
 		sdsSvc.st = st
 	}
@@ -74,11 +76,13 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		log.Info("DEBUG initSDSClient: init kube SDS client error: ", err)
 	}
 
-	// TODO get cert-signer from proxyconfig 
+	// TODO get cert-signer from proxyconfig
 	// sds server fetch the certificate from Istio configmap by default
 	caCert, err := sdsSvc.getMatchedCertificates("", "", "")
 	if err != nil {
 		log.Infof("DEBUG Handle CA certificates: %v", err)
+	} else {
+		sdsSvc.st.Cache.SetRoot([]byte(caCert.GetPem()))
 	}
 	log.Infof("Get the CA certificate: %v", caCert)
 
@@ -89,6 +93,7 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 	// TODO: Authenticate the stream context before handle it
 	// identitys, err := s.Authenticate(stream.Context())
 	log.Info("DEBUG 6: StreamSecret called")
+	var err error
 	errch := make(chan error, 1)
 	go func() {
 		for {
@@ -104,30 +109,49 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 		}
 	}()
 	var lastReq *discovery.DiscoveryRequest
-	for {
-		select {
-		case newReq := <-s.reqch:
-			s.st.SgxctxLock.Lock()
-			if s.st.SgxContext == nil {
-				s.st.SgxContext, _ = sgx.NewContext(sgx.Config{
-					HSMTokenLabel:   sgx.HSMTokenLabel,
-					HSMUserPin:      sgx.HSMUserPin,
-					HSMSoPin:        sgx.HSMSoPin,
-					HSMConfigPath:   sgx.SgxLibrary,
-					HSMKeyLabel:     sgx.HSMKeyLabel,
-					HSMKeyType:      sgx.HSMKeyType,
-				})
+	go func() {
+		for {
+			select {
+			case newReq := <-s.reqch:
+				s.st.SgxctxLock.Lock()
+				if s.st.SgxContext == nil {
+					s.st.SgxContext, _ = sgx.NewContext(sgx.Config{
+						HSMTokenLabel: sgx.HSMTokenLabel,
+						HSMUserPin:    sgx.HSMUserPin,
+						HSMSoPin:      sgx.HSMSoPin,
+						HSMConfigPath: sgx.SgxLibrary,
+						HSMKeyLabel:   sgx.HSMKeyLabel,
+						HSMKeyType:    sgx.HSMKeyType,
+					})
+				}
+				s.st.SgxctxLock.Unlock()
+				lastReq = newReq
+			case err = <-errch:
+				return
 			}
-			s.st.SgxctxLock.Unlock()
-			lastReq = newReq
-		case err := <-errch:
-			return err
+			resp, err := s.buildResponse(lastReq)
+			s.respch <- resp
+			if err != nil {
+				return
+			}
 		}
-		resp, err := s.buildResponse(lastReq)
+	}()
+
+	// used for workload certificate rotation
+	go func() {
+		for {
+			rotateRequest := <-s.pushch
+			resp, err := s.buildRotateResponse(rotateRequest)
+			if err != nil {
+				return
+			}
+			s.respch <- resp
+		}
+	}()
+
+	for {
+		err = stream.Send(<-s.respch)
 		if err != nil {
-			return fmt.Errorf("discovery error %v", err)
-		}
-		if err := stream.Send(resp); err != nil {
 			return err
 		}
 	}
@@ -145,6 +169,7 @@ func (s *sdsservice) Close() {
 	close(s.stop)
 	close(s.reqch)
 	close(s.respch)
+	close(s.pushch)
 }
 
 func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *discovery.DiscoveryResponse, err error) {
@@ -158,10 +183,36 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		// Generate CSR by resource name (`ROOTCA` or `default`)
 		// Get certificate (This should be handle by k8s client)
 		// Register the Certificate
-		cert, err := s.st.GenerateSecret(resourceName)
-		if err != nil {
-			return nil, fmt.Errorf("failed Create Certificate %v", err)
+
+		// Get cert from SecretManager Cache first
+		var cert []byte
+		ns, isCA := s.st.GetCachedSecret(resourceName)
+		if isCA {
+			cert = ns.RootCert
+		} else if ns == nil {
+			// Got cert from cache
+			log.Infof("DEBUG: cache secret is nil, generate new certificate")
+			cert, err = s.st.GenerateSecret(resourceName)
+			if err != nil {
+				return nil, fmt.Errorf("failed Create Certificate %v", err)
+			}
+			secretItem := security.SecretItem{
+				ResourceName:     resourceName,
+				CertificateChain: cert,
+				RootCert:         s.st.Cache.GetRoot(),
+				CreatedTime:      time.Now(),
+				ExpireTime:       time.Now().Add(time.Hour * 24),
+			}
+			// register the new generated secret
+			s.registerSecret(secretItem, resourceName)
+		} else {
+			cert = ns.CertificateChain
 		}
+		// TODO: Add K8s CSR watcher and get signed cert from kubeclient
+		// SubmitCSR and watch
+		// k8scsr, err := s.sdsClient.Kube().CertificatesV1().CertificateSigningRequests().Get(context.TODO(), resourceName, metav1.GetOptions{})
+		// cert = k8scsr.Status.Certificate
+
 		secret := &tlsv3.Secret{
 			Name: resourceName,
 		}
@@ -214,6 +265,72 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 	return resp, nil
 }
 
+// registerSecret will set the new secret to cache and call delay func
+func (s *sdsservice) registerSecret(item security.SecretItem, resourceName string) {
+	delay := s.st.RotateTime(item)
+	security.CertExpirySeconds.ValueFrom(func() float64 { return time.Until(item.ExpireTime).Seconds() }, item.ResourceName)
+	item.ResourceName = resourceName
+	if s.st.Cache.GetWorkload() != nil {
+		log.Info("%v skip scheduling certificate rotation, already scheduled", resourceName)
+		return
+	}
+	s.st.Cache.SetWorkload(&item)
+	log.Info(resourceName, ": scheduled certificate for rotation in %v", delay)
+
+	s.st.DelayQueue.PushDelayed(func() error {
+		// Clear the cache so the next call generates a fresh certificate
+		s.st.Cache.SetWorkload(nil)
+		rotateRequest := &discovery.Resource{
+			Name: item.ResourceName,
+		}
+		s.pushch <- rotateRequest
+		log.Infof("DEBUG: Time to delay, set workload as nil")
+		return nil
+	}, delay)
+}
+
+// buildRotateResponse build the rotateResponse from rotateRequest in push channel
+func (s *sdsservice) buildRotateResponse(rotateRequest *discovery.Resource) (*discovery.DiscoveryResponse, error) {
+	log.Infof("DEBUG: Build certificate rotation response now")
+	resp := &discovery.DiscoveryResponse{}
+	secret := &tlsv3.Secret{
+		Name: rotateRequest.Name,
+	}
+	cert, _ := s.st.GenerateSecret(rotateRequest.Name)
+	conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
+		SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
+		KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
+		UsrPin:     s.st.SgxConfigs.HSMUserPin,
+		SoPin:      s.st.SgxConfigs.HSMSoPin,
+		TokenLabel: s.st.SgxConfigs.HSMTokenLabel,
+		KeyType:    s.st.SgxConfigs.HSMKeyType,
+	})
+
+	secret.Type = &tlsv3.Secret_TlsCertificate{
+		TlsCertificate: &tlsv3.TlsCertificate{
+			CertificateChain: &corev3.DataSource{
+				Specifier: &corev3.DataSource_InlineBytes{
+					InlineBytes: cert,
+				},
+			},
+			PrivateKeyProvider: &tlsv3.PrivateKeyProvider{
+				ProviderName: "sgx",
+				ConfigType: &tlsv3.PrivateKeyProvider_TypedConfig{
+					TypedConfig: conf,
+				},
+			},
+			PrivateKey: nil,
+		},
+	}
+	res := MessageToAny(secret)
+	resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
+		Name:     rotateRequest.Name,
+		Resource: res,
+	}))
+	log.Infof("DEBUG: workload certificate updated successfully.")
+	return resp, nil
+}
+
 // initSDSClient create a default sds kube-istio client
 func (s *sdsservice) initSDSClient(kubeconfig, configContext string) error {
 	kubeRestConfig, err := kube.DefaultRestConfig(kubeconfig, configContext, func(config *rest.Config) {
@@ -254,7 +371,7 @@ func (s *sdsservice) getMatchedCertificates(meshConfigMapName, revision string, 
 			for _, caCert := range meshConf.CaCertificates {
 				for _, signerName := range caCert.CertSigners {
 					signers := strings.Split(signerName, "/")
-					signer := signers[len(signers) - 1]
+					signer := signers[len(signers)-1]
 					if certSigner == signer {
 						return caCert, nil
 					}

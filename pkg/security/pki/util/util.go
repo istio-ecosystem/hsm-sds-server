@@ -2,10 +2,13 @@ package util
 
 import (
 	"crypto/x509"
-	"istio.io/pkg/log"
+	"sync"
 	"time"
 
+	"istio.io/pkg/log"
+
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/queue"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 )
 
@@ -14,6 +17,7 @@ import (
 func NewSecretManager(options *security.CertOptions) (*security.SecretManager, error) {
 	st := &security.SecretManager{
 		Name:          "SecretManager for SDS Server",
+		DelayQueue:    queue.NewDelayed(queue.DelayQueueBuffer(0)),
 		ConfigOptions: options,
 		SgxConfigs: &sgx.Config{
 			HSMTokenLabel: sgx.HSMTokenLabel,
@@ -23,6 +27,8 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 			HSMKeyLabel:   sgx.HSMKeyLabel,
 			HSMKeyType:    sgx.HSMKeyType,
 		},
+		SgxctxLock: sync.Mutex{},
+		Stop:       make(chan struct{}),
 	}
 
 	var err error
@@ -47,9 +53,11 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 		return nil, err
 	}
 	// todo: replace it via reading from CSR
-	if _, err := st.CreateNewCertificate(csrPem, time.Hour*24, false, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
+	if _, err := st.CreateNewCertificate(csrPem, nil, time.Hour*24, false, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
 		[]x509.ExtKeyUsage{}); err != nil {
 		log.Info("failed to create Certificate: ", err)
 	}
+
+	go st.DelayQueue.Run(st.Stop)
 	return st, nil
 }

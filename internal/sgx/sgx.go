@@ -452,6 +452,25 @@ func (ctx *SgxContext) InitializeKey(keyLabel, keyAlgo string, keySize int) erro
 	return nil
 }
 
+func (ctx *SgxContext) RemoveKey(keyLabel string) error {
+	if ctx == nil || ctx.cryptoCtx == nil {
+		return fmt.Errorf("sgx context not initialized")
+	}
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
+	privKey, err := ctx.cryptoCtx.FindKeyPair(nil, []byte(keyLabel))
+	if err != nil {
+		return fmt.Errorf("can't find pkcs11 keypair: %v", err)
+	}
+	if privKey != nil {
+		dErr := privKey.Delete()
+		if dErr != nil {
+			return dErr
+		}
+	}
+	return nil
+}
+
 func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
 	pub, priv, err := generateP11KeyPair(ctx.p11Ctx, ctx.p11Session)
 	if err != nil {
