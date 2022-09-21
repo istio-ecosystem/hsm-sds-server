@@ -183,7 +183,12 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
           if matches=$(grep -w -e MPL -e GPL -e LGPL /tmp/runtime-doc/$pkg/copyright); then \
              echo "INFO: downloading source of $pkg because of the following licenses:"; \
              echo "$matches" | sed -e 's/^/    /'; \
-             apt-get source --download-only $pkg=$version || exit 1; \
+            # temperory fix: Remove exit 1
+            # error occured because run: apt-get source --download-only libsqlite3-0=3.31.1-4ubuntu0.3 
+            # since get the version 3.31.1-4ubuntu0.3 in package-install.log
+            # but ubuntu updated debain pkg to 3.31.1-4ubuntu0.4
+            # https://packages.ubuntu.com/search?keywords=libsqlite3-0
+             apt-get source --download-only $pkg=$version; \
           else \
              echo "INFO: not downloading source of $pkg, found no copyleft license"; \
           fi; \
