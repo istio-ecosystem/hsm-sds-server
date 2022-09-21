@@ -31,6 +31,10 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 		Stop:       make(chan struct{}),
 	}
 
+	// init the SecretCache
+	st.Cache = security.SecretCache{}
+	st.GetCredNameMap()
+
 	var err error
 	if err = st.SgxConfigs.Validate(); err != nil {
 		log.Warnf("invalid SGX Config")

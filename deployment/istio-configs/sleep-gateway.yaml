@@ -1,0 +1,35 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: testuds-gateway
+spec:
+  selector:
+    istio:   ingressgateway
+    app:     testuds 
+  servers:
+  - port:
+      number: 443 
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "*"
+    tls:
+      mode: SIMPLE
+      credentialName: sds://testsds.com 
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: testuds
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - testuds-gateway
+  http:
+  - route:
+    - destination:
+        host: testuds
+        port:
+          number: 80 
+

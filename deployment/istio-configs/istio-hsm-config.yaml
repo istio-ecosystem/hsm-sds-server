@@ -64,6 +64,8 @@ spec:
                 mountPath: /var/run/secrets/credential-uds
               - name: sgx-libraries
                 mountPath: /usr/local/libsgx
+              - name: istio-podinfo
+                mountPath: /etc/istio/pod
             - name: istio-proxy
               volumeMounts:
               - name: sds-server

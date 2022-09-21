@@ -29,6 +29,7 @@ import (
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/gateway"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security/pki/util"
 )
@@ -49,6 +50,7 @@ type sdsservice struct {
 	respch    chan *discovery.DiscoveryResponse
 	pushch    chan *discovery.Resource
 	sdsClient kube.Client
+	gwWatcher *gateway.GatewayWatcher
 }
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
@@ -72,19 +74,31 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		sdsSvc.st = st
 	}
 
-	if err := sdsSvc.initSDSClient(kubeconfig, configContext); err != nil {
-		log.Info("DEBUG initSDSClient: init kube SDS client error: ", err)
-	}
+	if sdsSvc != nil {
+		if err := sdsSvc.initSDSClient(kubeconfig, configContext); err != nil {
+			log.Info("DEBUG initSDSClient: init kube SDS client error: ", err)
+		}
 
-	// TODO get cert-signer from proxyconfig
-	// sds server fetch the certificate from Istio configmap by default
-	caCert, err := sdsSvc.getMatchedCertificates("", "", "")
-	if err != nil {
-		log.Infof("DEBUG Handle CA certificates: %v", err)
-	} else {
-		sdsSvc.st.Cache.SetRoot([]byte(caCert.GetPem()))
+		// New a GateWayWatcher to watch the credential name of SDS server
+		gwWatcher, err := gateway.NewGatewayWatcher(sdsSvc.sdsClient, st)
+		if err != nil {
+			log.Errorf("error in NewGateWayWatcher: %v", err)
+		}
+		sdsSvc.gwWatcher = gwWatcher
+		// start GatewayWatcher to watch the gateway credential Name of SDS service
+		log.Info("start GatewayWatcher to watch the gateway credential Name of SDS service")
+		go sdsSvc.gwWatcher.Run(sdsSvc.stop)
+
+		// TODO get cert-signer from proxyconfig
+		// sds server fetch the certificate from Istio configmap by default
+		caCert, err := sdsSvc.getMatchedCertificates("", "", "")
+		if err != nil {
+			log.Infof("DEBUG Handle CA certificates: %v", err)
+		} else {
+			sdsSvc.st.Cache.SetRoot([]byte(caCert.GetPem()))
+		}
+		log.Infof("Get the CA certificate: %v", caCert)
 	}
-	log.Infof("Get the CA certificate: %v", caCert)
 
 	return sdsSvc
 }

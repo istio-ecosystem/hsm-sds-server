@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	istioapi "istio.io/api/networking/v1alpha3"
 	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 
@@ -34,7 +35,7 @@ type SecretManager struct {
 	SgxConfigs    *sgx.Config
 	SgxContext    *sgx.SgxContext
 	SgxctxLock    sync.Mutex
-	Cache         secretCache
+	Cache         SecretCache
 	// queue maintains all certificate rotation events that need to be triggered when they are about to expire
 	DelayQueue queue.Delayed
 	Stop       chan struct{}
@@ -42,11 +43,12 @@ type SecretManager struct {
 	secretHandler func(resourceName string)
 }
 
-type secretCache struct {
-	mu       sync.RWMutex
-	workload *SecretItem
-	rootCert []byte
-	csrBytes []byte
+type SecretCache struct {
+	mu          sync.RWMutex
+	workload    *SecretItem
+	rootCert    []byte
+	csrBytes    []byte
+	credNameMap map[*istioapi.Port]string
 }
 
 type SecretItem struct {
@@ -284,20 +286,20 @@ func (sc *SecretManager) GetCachedSecret(resourceName string) (*SecretItem, bool
 }
 
 // GetRoot returns cached root cert and cert expiration time. This method is thread safe.
-func (s *secretCache) GetRoot() (rootCert []byte) {
+func (s *SecretCache) GetRoot() (rootCert []byte) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.rootCert
 }
 
 // SetRoot sets root cert into cache. This method is thread safe.
-func (s *secretCache) SetRoot(rootCert []byte) {
+func (s *SecretCache) SetRoot(rootCert []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.rootCert = rootCert
 }
 
-func (s *secretCache) GetWorkload() *SecretItem {
+func (s *SecretCache) GetWorkload() *SecretItem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.workload == nil {
@@ -306,10 +308,33 @@ func (s *secretCache) GetWorkload() *SecretItem {
 	return s.workload
 }
 
-func (s *secretCache) SetWorkload(value *SecretItem) {
+func (s *SecretCache) SetWorkload(value *SecretItem) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.workload = value
+}
+
+func (sc *SecretManager) GetCredNameMap() map[*istioapi.Port]string {
+	if sc.Cache.credNameMap == nil {
+		sc.Cache.credNameMap = make(map[*istioapi.Port]string)
+	}
+	return sc.Cache.credNameMap
+}
+
+func (sc *SecretManager) GetCredNameMapWithPort(port *istioapi.Port) string {
+	if sc.Cache.credNameMap != nil {
+		return sc.Cache.credNameMap[port]
+	}
+	return ""
+}
+
+func (sc *SecretManager) SetCredNameMap(port *istioapi.Port, credName string) {
+	sc.Cache.mu.RLock()
+	defer sc.Cache.mu.RUnlock()
+	if sc.Cache.credNameMap == nil {
+		sc.Cache.credNameMap = make(map[*istioapi.Port]string)
+	}
+	sc.Cache.credNameMap[port] = credName
 }
 
 func (sc *SecretManager) RegisterSecretHandler(h func(resourceName string)) {
