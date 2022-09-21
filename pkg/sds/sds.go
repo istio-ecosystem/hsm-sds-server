@@ -48,7 +48,7 @@ type sdsservice struct {
 	stop      chan struct{}
 	reqch     chan *discovery.DiscoveryRequest
 	respch    chan *discovery.DiscoveryResponse
-	pushch    chan *discovery.Resource
+	pushch    chan string
 	sdsClient kube.Client
 	gwWatcher *gateway.GatewayWatcher
 }
@@ -69,7 +69,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 			stop:   make(chan struct{}),
 			reqch:  make(chan *discovery.DiscoveryRequest, 1),
 			respch: make(chan *discovery.DiscoveryResponse, 1),
-			pushch: make(chan *discovery.Resource, 1),
+			pushch: make(chan string, 1),
 		}
 		sdsSvc.st = st
 	}
@@ -241,31 +241,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				},
 			}
 		} else {
-			conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
-				SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
-				KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
-				UsrPin:     s.st.SgxConfigs.HSMUserPin,
-				SoPin:      s.st.SgxConfigs.HSMSoPin,
-				TokenLabel: s.st.SgxConfigs.HSMTokenLabel,
-				KeyType:    s.st.SgxConfigs.HSMKeyType,
-			})
-
-			secret.Type = &tlsv3.Secret_TlsCertificate{
-				TlsCertificate: &tlsv3.TlsCertificate{
-					CertificateChain: &corev3.DataSource{
-						Specifier: &corev3.DataSource_InlineBytes{
-							InlineBytes: cert,
-						},
-					},
-					PrivateKeyProvider: &tlsv3.PrivateKeyProvider{
-						ProviderName: "sgx",
-						ConfigType: &tlsv3.PrivateKeyProvider_TypedConfig{
-							TypedConfig: conf,
-						},
-					},
-					PrivateKey: nil,
-				},
-			}
+			s.toEnvoyWorkloadSecret(secret, cert)
 		}
 
 		res := MessageToAny(secret)
@@ -294,23 +270,32 @@ func (s *sdsservice) registerSecret(item security.SecretItem, resourceName strin
 	s.st.DelayQueue.PushDelayed(func() error {
 		// Clear the cache so the next call generates a fresh certificate
 		s.st.Cache.SetWorkload(nil)
-		rotateRequest := &discovery.Resource{
-			Name: item.ResourceName,
-		}
-		s.pushch <- rotateRequest
+		s.pushch <- item.ResourceName
 		log.Infof("DEBUG: Time to delay, set workload as nil")
 		return nil
 	}, delay)
 }
 
 // buildRotateResponse build the rotateResponse from rotateRequest in push channel
-func (s *sdsservice) buildRotateResponse(rotateRequest *discovery.Resource) (*discovery.DiscoveryResponse, error) {
+func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.DiscoveryResponse, error) {
 	log.Infof("DEBUG: Build certificate rotation response now")
 	resp := &discovery.DiscoveryResponse{}
 	secret := &tlsv3.Secret{
-		Name: rotateRequest.Name,
+		Name: resourceName,
 	}
-	cert, _ := s.st.GenerateSecret(rotateRequest.Name)
+	cert, _ := s.st.GenerateSecret(resourceName)
+	s.toEnvoyWorkloadSecret(secret, cert)
+	res := MessageToAny(secret)
+	resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
+		Name:     resourceName,
+		Resource: res,
+	}))
+	log.Infof("DEBUG: workload certificate updated successfully.")
+	return resp, nil
+}
+
+// toEnvoyWorkloadSecret add generated cert and sgx configs to tls.Secret
+func (s *sdsservice) toEnvoyWorkloadSecret(secret *tlsv3.Secret, cert []byte) {
 	conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
 		SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
 		KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
@@ -336,13 +321,6 @@ func (s *sdsservice) buildRotateResponse(rotateRequest *discovery.Resource) (*di
 			PrivateKey: nil,
 		},
 	}
-	res := MessageToAny(secret)
-	resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
-		Name:     rotateRequest.Name,
-		Resource: res,
-	}))
-	log.Infof("DEBUG: workload certificate updated successfully.")
-	return resp, nil
 }
 
 // initSDSClient create a default sds kube-istio client
