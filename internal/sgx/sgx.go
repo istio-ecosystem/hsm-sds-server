@@ -56,6 +56,7 @@ import (
 	"crypto"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -130,8 +131,11 @@ type SgxContext struct {
 	cryptoCtx     *crypto11.Context
 	cryptoCtxLock sync.Mutex
 	cfg           *Config
+
+	// self signed signers
+	pendingSelfSignedSigners map[string]struct{}
+	selfSignedSignerNames    []string
 	// k8sClient client.Client
-	// signers   *signer.SignerMap
 	qaCounter uint64
 	log       logr.Logger
 }
@@ -171,9 +175,9 @@ func (cfg *Config) Validate() error {
 
 func NewContext(cfg Config) (*SgxContext, error) {
 	ctx := &SgxContext{
-		cfg: &cfg,
-		// k8sClient: client,
-		log: ctrl.Log.WithName("SGX"),
+		cfg:                      &cfg,
+		log:                      ctrl.Log.WithName("SGX"),
+		pendingSelfSignedSigners: map[string]struct{}{},
 	}
 	if err := ctx.reloadCryptoContext(); err != nil {
 		if err.Error() == "could not find PKCS#11 token" /* crypto11.errNotFoundError */ {
@@ -191,7 +195,7 @@ func NewContext(cfg Config) (*SgxContext, error) {
 	ctx.p11Ctx = pkcs11.New(SgxLibrary)
 
 	ctx.log.Info("Initiating p11Session...")
-	sh, err := initP11Session(ctx.p11Ctx, cfg.HSMTokenLabel, cfg.HSMUserPin, cfg.HSMSoPin)
+	sh, err := initP11Session(ctx.p11Ctx, cfg.HSMTokenLabel)
 	if err != nil {
 		ctx.Destroy()
 		return nil, err
@@ -204,6 +208,44 @@ func NewContext(cfg Config) (*SgxContext, error) {
 func (ctx *SgxContext) Destroy() {
 	ctx.destroyP11Context()
 	ctx.destroyCryptoContext()
+}
+
+func (ctx *SgxContext) Quote() ([]byte, error) {
+	if ctx.ctkQuote == nil {
+		return nil, fmt.Errorf("empty quote")
+	}
+	strQuote := base64.StdEncoding.EncodeToString(ctx.ctkQuote)
+	return []byte(strQuote), nil
+}
+
+// QuotePublicKey returns the base64 encoded key
+// used for quote generation
+func (ctx *SgxContext) QuotePublicKey() ([]byte, error) {
+	// ctx.p11CtxLock.Lock()
+	// defer ctx.p11CtxLock.Unlock()
+
+	template := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
+		pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),
+	}
+	attrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, ctx.quotePubKey, template)
+	if err != nil {
+		return nil, err
+	}
+	var modulus = new(big.Int)
+	modulus.SetBytes(attrs[0].Value)
+	var bigExponent = new(big.Int)
+	bigExponent.SetBytes(attrs[1].Value)
+	if bigExponent.BitLen() > 32 || bigExponent.Sign() < 1 {
+		return nil, fmt.Errorf("malformed quote public key")
+	}
+	exponent := int(bigExponent.Uint64())
+	key := rsa.PublicKey{
+		N: modulus,
+		E: exponent,
+	}
+
+	return EncodePublicKey(&key)
 }
 
 func (ctx *SgxContext) TokenLabel() (string, error) {
@@ -281,7 +323,7 @@ func (ctx *SgxContext) initializeToken() error {
 	return ctx.reloadCryptoContext()
 }
 
-func initP11Session(p11Ctx *pkcs11.Ctx, tokenLabel, userPin, soPin string) (pkcs11.SessionHandle, error) {
+func initP11Session(p11Ctx *pkcs11.Ctx, tokenLabel string) (pkcs11.SessionHandle, error) {
 	slot, err := findP11Slot(p11Ctx, tokenLabel)
 	if err != nil {
 		return 0, err
@@ -489,6 +531,7 @@ func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
 	ctx.ctkQuote = quote
 	return nil
 }
+
 func generateQuote(p11Ctx *pkcs11.Ctx, p11Session pkcs11.SessionHandle, pubKey pkcs11.ObjectHandle) ([]byte, error) {
 	// Wrap the key
 	quoteParams := C.CK_ECDSA_QUOTE_RSA_PUBLIC_KEY_PARAMS{
@@ -509,6 +552,16 @@ func generateQuote(p11Ctx *pkcs11.Ctx, p11Session pkcs11.SessionHandle, pubKey p
 
 	offset := int(C.quote_offset(*(*C.CK_BYTE_PTR)(unsafe.Pointer(&quotePubKey))))
 	return quotePubKey[offset:], nil
+}
+
+func (ctx *SgxContext) GetSignerForName(name string) (crypto11.Signer, error) {
+	if ctx == nil || ctx.cryptoCtx == nil {
+		return nil, fmt.Errorf("sgx context not initialized")
+	}
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
+
+	return ctx.cryptoCtx.FindKeyPair(nil, []byte(name))
 }
 
 // This method should be called on reply getting from key-manager
