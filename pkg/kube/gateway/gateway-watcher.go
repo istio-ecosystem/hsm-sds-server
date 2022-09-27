@@ -92,8 +92,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	ctx := context.Background()
 	instanceName := quoteAttestationPrefix + gatewayCR.Name
 	// TODO: pendingSelfSignerName should be fetched from some other places
-	// pendingSelfSignerName := "clusterissuers.cert-manager.io/istio-system"
-	pendingSelfSignerName := "default-4"
+	pendingSelfSignerName := "clusterissuers.cert-manager.io/istio-system"
 	if pendingSelfSignerName != "" {
 		if err := gw.QuoteAttestationDeliver(ctx, pendingSelfSignerName, instanceName, gatewayCR.Namespace); err != nil {
 			log.Errorf("failed to created or updated quoteAttestation CR %s", err)
