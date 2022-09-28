@@ -29,6 +29,7 @@ import (
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/csrwatcher"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/gateway"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security/pki/util"
@@ -44,13 +45,14 @@ const (
 )
 
 type sdsservice struct {
-	st        *security.SecretManager
-	stop      chan struct{}
-	reqch     chan *discovery.DiscoveryRequest
-	respch    chan *discovery.DiscoveryResponse
-	pushch    chan string
-	sdsClient kube.Client
-	gwWatcher *gateway.GatewayWatcher
+	st         *security.SecretManager
+	stop       chan struct{}
+	reqch      chan *discovery.DiscoveryRequest
+	respch     chan *discovery.DiscoveryResponse
+	pushch     chan string
+	sdsClient  kube.Client
+	gwWatcher  *gateway.GatewayWatcher
+	csrWatcher *csrwatcher.K8sCSRWatcher
 }
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
@@ -98,6 +100,14 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 			sdsSvc.st.Cache.SetRoot([]byte(caCert.GetPem()))
 		}
 		log.Infof("Get the CA certificate: %v", caCert)
+
+		csrWatcher, err := csrwatcher.NewK8sCSRWatcher(sdsSvc.sdsClient, st)
+		if err != nil {
+			log.Errorf("error in NewK8sCSRWatcher: %v", err)
+		}
+		sdsSvc.csrWatcher = csrWatcher
+		log.Info("start csrWatcher to watch the Kubernetes CSR object of SDS service")
+		go sdsSvc.csrWatcher.Run(sdsSvc.stop)
 	}
 
 	return sdsSvc
@@ -204,9 +214,9 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		if isCA {
 			cert = ns.RootCert
 		} else if ns == nil {
-			// Got cert from cache
 			log.Infof("DEBUG: cache secret is nil, generate new certificate")
-			cert, err = s.st.GenerateSecret(resourceName)
+			// cert, err = s.st.GenerateSecret(resourceName)
+			cert, err = s.GenCSRandGetCert(resourceName)
 			if err != nil {
 				return nil, fmt.Errorf("failed Create Certificate %v", err)
 			}
@@ -283,7 +293,8 @@ func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.Discov
 	secret := &tlsv3.Secret{
 		Name: resourceName,
 	}
-	cert, _ := s.st.GenerateSecret(resourceName)
+	// cert, _ := s.st.GenerateSecret(resourceName)
+	cert, _ := s.GenCSRandGetCert(resourceName)
 	s.toEnvoyWorkloadSecret(secret, cert)
 	res := MessageToAny(secret)
 	resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
@@ -292,6 +303,58 @@ func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.Discov
 	}))
 	log.Infof("DEBUG: workload certificate updated successfully.")
 	return resp, nil
+}
+
+func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
+	isCA := false
+	log.Info(resourceName)
+	var cert []byte
+	var err error
+	if resourceName == security.RootCertName {
+		isCA = true
+	}
+	if isCA {
+		if cert = s.st.Cache.GetRoot(); cert != nil {
+			log.Info("Find root cert in secret cache")
+			return cert, err
+		} else {
+			return nil, fmt.Errorf("%v cert not found", resourceName)
+		}
+	} else {
+		csrBytes, err := s.st.GenerateCSR(*s.st.ConfigOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
+		}
+		// SetcsrBytes and wait for third part CA signed certificate
+		s.st.Cache.SetcsrBytes(csrBytes)
+		k8scsr, err := s.CreateK8sCSR(csrBytes, resourceName)
+		if err != nil {
+			return nil, err
+		}
+		for i := 0; i < 5; i++ {
+			// Waiting for signed CSR object and get cert from spec
+			if k8scsr.Status.Certificate != nil {
+				log.Info("Get signed certificate from CSR object")
+				return k8scsr.Status.Certificate, nil
+			}
+			// 500ms
+			time.Sleep(time.Millisecond * 500)
+		}
+		// Else self-sign a cert
+		// signerCert, err := security.ParsePemEncodedCertificate(s.st.Cache.GetRoot())
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed get signer cert from cache %v", err)
+		// }
+		// if signerCert != nil {
+		// 	s.st.ConfigOptions.SignerCert = signerCert
+		// }
+		// cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
+		// 	[]x509.ExtKeyUsage{})
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed Create New Certificate: %v", err)
+		// }
+	}
+	return cert, nil
 }
 
 // toEnvoyWorkloadSecret add generated cert and sgx configs to tls.Secret

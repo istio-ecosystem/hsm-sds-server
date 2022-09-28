@@ -26,7 +26,12 @@ const (
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
+	PendingSelfSignerName      = "clusterissuers.cert-manager.io/istio-system"
+	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
 )
+
+// Default cert expire seconds: one day
+var DefaultExpirationSeconds int32 = 86400
 
 type SecretManager struct {
 	Name string
@@ -188,10 +193,12 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 			return nil, fmt.Errorf("%v cert not found", resourceName)
 		}
 	} else {
-		csrBytes, err := sc.GenerateK8sCSR(*sc.ConfigOptions)
+		csrBytes, err := sc.GenerateCSR(*sc.ConfigOptions)
 		if err != nil {
 			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
 		}
+		// SetcsrBytes and wait for third part CA signed certificate
+		sc.Cache.SetcsrBytes(csrBytes)
 		signerCert, err := ParsePemEncodedCertificate(sc.Cache.GetRoot())
 		if err != nil {
 			return nil, fmt.Errorf("failed get signer cert from cache %v", err)
@@ -208,7 +215,7 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 	return cert, nil
 }
 
-func (sc *SecretManager) GenerateK8sCSR(options CertOptions) ([]byte, error) {
+func (sc *SecretManager) GenerateCSR(options CertOptions) ([]byte, error) {
 
 	csrHostName := &SPIFFEIdentity{
 		TrustDomain:    TrustDomain,
@@ -285,7 +292,7 @@ func (sc *SecretManager) GetCachedSecret(resourceName string) (*SecretItem, bool
 	}
 }
 
-// GetRoot returns cached root cert and cert expiration time. This method is thread safe.
+// GetRoot returns cached root cert. This method is thread safe.
 func (s *SecretCache) GetRoot() (rootCert []byte) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -299,6 +306,7 @@ func (s *SecretCache) SetRoot(rootCert []byte) {
 	s.rootCert = rootCert
 }
 
+// GetRoot returns cached workload SecretItem. This method is thread safe.
 func (s *SecretCache) GetWorkload() *SecretItem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -308,10 +316,25 @@ func (s *SecretCache) GetWorkload() *SecretItem {
 	return s.workload
 }
 
+// SetWorkload sets workload SecretItem into cache. This method is thread safe.
 func (s *SecretCache) SetWorkload(value *SecretItem) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.workload = value
+}
+
+// SetcsrBytes sets csrBytes into cache. This method is thread safe.
+func (s *SecretCache) SetcsrBytes(csrBytes []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.csrBytes = csrBytes
+}
+
+// SetcsrBytes sets csrBytes into cache. This method is thread safe.
+func (s *SecretCache) GetcsrBytes() (csrBytes []byte) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.csrBytes
 }
 
 func (sc *SecretManager) GetCredNameMap() map[*istioapi.Port]string {

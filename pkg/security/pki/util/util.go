@@ -51,7 +51,7 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 		log.Warnf("failed to create default private key via sgx: ", err)
 		return nil, err
 	}
-	csrPem, err := st.GenerateK8sCSR(*options)
+	csrPem, err := st.GenerateCSR(*options)
 	if err != nil {
 		log.Info("failed to generate Kubernetes CSR: ", err)
 		return nil, err

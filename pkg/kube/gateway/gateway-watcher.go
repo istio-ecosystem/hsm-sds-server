@@ -16,7 +16,7 @@ import (
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/util/downwardAPI"
+	downward "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/util/downwardAPI"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/util/labels"
 
 	istioapi "istio.io/api/networking/v1alpha3"
@@ -51,7 +51,7 @@ func (gw *GatewayWatcher) Run(stopCh chan struct{}) {
 	go gw.gwInformer.Run(stopCh)
 	// wait for the initial synchronization of the local cache.
 	if !cache.WaitForCacheSync(stopCh, gw.gwInformer.HasSynced) {
-		 log.Error("failed to wait for cache sync")
+		log.Error("failed to wait for cache sync")
 	}
 	go gw.queue.Run(stopCh)
 }
@@ -92,7 +92,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	ctx := context.Background()
 	instanceName := quoteAttestationPrefix + gatewayCR.Name
 	// TODO: pendingSelfSignerName should be fetched from some other places
-	pendingSelfSignerName := "clusterissuers.cert-manager.io/istio-system"
+	pendingSelfSignerName := security.PendingSelfSignerName
 	if pendingSelfSignerName != "" {
 		if err := gw.QuoteAttestationDeliver(ctx, pendingSelfSignerName, instanceName, gatewayCR.Namespace); err != nil {
 			log.Errorf("failed to created or updated quoteAttestation CR %s", err)
@@ -116,7 +116,7 @@ func (gw *GatewayWatcher) Reconcile(req types.NamespacedName) error {
 	return nil
 }
 
-// NewGatewayWatcher creates a GatewayWatcher instance 
+// NewGatewayWatcher creates a GatewayWatcher instance
 func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*GatewayWatcher, error) {
 	log.Info("New GatewayWatcher in SDS server")
 	gwInf := client.IstioInformer().Networking().V1alpha3().Gateways().Informer()
