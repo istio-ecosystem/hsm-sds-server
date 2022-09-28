@@ -331,7 +331,7 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		for i := 0; i < 5; i++ {
+		for i := 0; i < security.MAXRetryTime; i++ {
 			// Waiting for signed CSR object and get cert from spec
 			if k8scsr.Status.Certificate != nil {
 				log.Info("Get signed certificate from CSR object")

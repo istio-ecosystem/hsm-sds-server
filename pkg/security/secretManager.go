@@ -27,6 +27,8 @@ const (
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
 	PendingSelfSignerName      = "clusterissuers.cert-manager.io/istio-system"
+	// Max retry time to get signed certificate in kubernetes csr
+	MAXRetryTime = 5
 	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
 )
 
