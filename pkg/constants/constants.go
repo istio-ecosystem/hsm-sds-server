@@ -1,6 +1,11 @@
 package constants
 
 const (
+	ClusterIssuerKind      = "ClusterIssuer"
+	IssuerKind             = "Issuer"
+	CertificateKind        = "Certificate"
+	CertificateRequestKind = "CertificateRequest"
+
 	// PodInfoLabelsPath is the filepath that pod labels will be stored
 	// This is typically set by the downward API
 	PodInfoLabelsPath = "./etc/istio/pod/labels"

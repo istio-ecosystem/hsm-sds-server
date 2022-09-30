@@ -646,3 +646,22 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 
 	return nil
 }
+
+func (ctx *SgxContext) RemoveKeyForSigner(name string) error {
+	if ctx == nil || ctx.cryptoCtx == nil {
+		return fmt.Errorf("sgx context not initialized")
+	}
+	ctx.cryptoCtxLock.Lock()
+	defer ctx.cryptoCtxLock.Unlock()
+	signer, err := ctx.cryptoCtx.FindKeyPair(nil, []byte(name))
+	if err != nil {
+		return err
+	}
+	if signer != nil {
+		dErr := signer.Delete()
+		if dErr != nil {
+			return dErr
+		}
+	}
+	return nil
+}

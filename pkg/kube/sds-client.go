@@ -66,6 +66,12 @@ type Client interface {
 	// ExtInformer returns an informer for the extension client
 	ExtInformer() kubeExtInformers.SharedInformerFactory
 
+	// QaAPIInformer returns an informer for the quote attestation client
+	QaAPIInformer() qaapiinformer.SharedInformerFactory
+
+	// QaAPI returns the quote attestation kube client
+	QaAPI() tcsv1alpha1.Interface
+
 	// RunAndWait starts all informers and waits for their caches to sync.
 	// Warning: this must be called AFTER .Informer() is called, which will register the informer.
 	RunAndWait(stop <-chan struct{})

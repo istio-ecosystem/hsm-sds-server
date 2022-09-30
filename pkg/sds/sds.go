@@ -29,6 +29,7 @@ import (
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/quoteattestation"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/csrwatcher"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/gateway"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
@@ -52,6 +53,7 @@ type sdsservice struct {
 	pushch     chan string
 	sdsClient  kube.Client
 	gwWatcher  *gateway.GatewayWatcher
+	qaWatcher  *quoteattestation.QuoteAttestationWatcher
 	csrWatcher *csrwatcher.K8sCSRWatcher
 }
 
@@ -81,8 +83,8 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 			log.Info("DEBUG initSDSClient: init kube SDS client error: ", err)
 		}
 
-		// New a GateWayWatcher to watch the credential name of SDS server
-		gwWatcher, err := gateway.NewGatewayWatcher(sdsSvc.sdsClient, st)
+		// New a GateWayWatcher to watch the credential name of SDS service
+		gwWatcher, err := gateway.NewGatewayWatcher(sdsSvc.sdsClient, sdsSvc.st)
 		if err != nil {
 			log.Errorf("error in NewGateWayWatcher: %v", err)
 		}
@@ -90,6 +92,14 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		// start GatewayWatcher to watch the gateway credential Name of SDS service
 		log.Info("start GatewayWatcher to watch the gateway credential Name of SDS service")
 		go sdsSvc.gwWatcher.Run(sdsSvc.stop)
+
+		// New a QuoteAttestationWatcher to watch the QuoteAttestation object of SDS service
+		qaWatcher, err := quoteattestation.NewQuoteAttestationWatcher(sdsSvc.sdsClient, sdsSvc.st)
+		if err != nil {
+			log.Errorf("error in NewQuoteAttestationWatcher: %v", err)
+		}
+		sdsSvc.qaWatcher = qaWatcher
+		go sdsSvc.qaWatcher.Run(sdsSvc.stop)
 
 		// TODO get cert-signer from proxyconfig
 		// sds server fetch the certificate from Istio configmap by default
@@ -101,7 +111,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		}
 		log.Infof("Get the CA certificate: %v", caCert)
 
-		csrWatcher, err := csrwatcher.NewK8sCSRWatcher(sdsSvc.sdsClient, st)
+		csrWatcher, err := csrwatcher.NewK8sCSRWatcher(sdsSvc.sdsClient, sdsSvc.st)
 		if err != nil {
 			log.Errorf("error in NewK8sCSRWatcher: %v", err)
 		}
