@@ -2,10 +2,13 @@ package sds
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +23,7 @@ import (
 	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
+	"github.com/zeebo/errs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/prototext"
@@ -29,9 +33,9 @@ import (
 	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/quoteattestation"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/csrwatcher"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/gateway"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/quoteattestation"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security/pki/util"
 )
@@ -46,16 +50,28 @@ const (
 )
 
 type sdsservice struct {
-	st         *security.SecretManager
-	stop       chan struct{}
-	reqch      chan *discovery.DiscoveryRequest
-	respch     chan *discovery.DiscoveryResponse
-	pushch     chan string
-	sdsClient  kube.Client
-	gwWatcher  *gateway.GatewayWatcher
-	qaWatcher  *quoteattestation.QuoteAttestationWatcher
-	csrWatcher *csrwatcher.K8sCSRWatcher
+	st                  *security.SecretManager
+	stop                chan struct{}
+	reqch               chan *discovery.DiscoveryRequest
+	respch              chan *discovery.DiscoveryResponse
+	pushch              chan string
+	VersionInfoandNonce map[string]VersionInfoandNonce
+	sdsClient           kube.Client
+	gwWatcher           *gateway.GatewayWatcher
+	qaWatcher           *quoteattestation.QuoteAttestationWatcher
+	csrWatcher          *csrwatcher.K8sCSRWatcher
 }
+
+type VersionInfoandNonce struct {
+	VersionInfo string
+	Nonce       string
+}
+
+var (
+	versionCounter int64
+	versionInfo    = strconv.FormatInt(versionCounter, 10)
+	nonce          string
+)
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
 func newSDSService(kubeconfig, configContext string) *sdsservice {
@@ -70,10 +86,11 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 	st, err := util.NewSecretManager(&options)
 	if st != nil && err == nil {
 		sdsSvc = &sdsservice{
-			stop:   make(chan struct{}),
-			reqch:  make(chan *discovery.DiscoveryRequest, 1),
-			respch: make(chan *discovery.DiscoveryResponse, 1),
-			pushch: make(chan string, 1),
+			stop:                make(chan struct{}),
+			reqch:               make(chan *discovery.DiscoveryRequest, 1),
+			respch:              make(chan *discovery.DiscoveryResponse, 1),
+			pushch:              make(chan string, 1),
+			VersionInfoandNonce: make(map[string]VersionInfoandNonce),
 		}
 		sdsSvc.st = st
 	}
@@ -126,7 +143,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSecretsServer) error {
 	// TODO: Authenticate the stream context before handle it
 	// identitys, err := s.Authenticate(stream.Context())
-	log.Info("DEBUG 6: StreamSecret called")
+	log.Info("DEBUG: StreamSecret called")
 	var err error
 	errch := make(chan error, 1)
 	go func() {
@@ -139,7 +156,11 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 				errch <- err
 				return
 			}
-			s.reqch <- req
+			if s.shouldResponse(req) {
+				s.reqch <- req
+				versionCounter++
+				nonce, _ = nextNonce()
+			}
 		}
 	}()
 	var lastReq *discovery.DiscoveryRequest
@@ -175,6 +196,8 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 	go func() {
 		for {
 			rotateRequest := <-s.pushch
+			// versionCounter++
+			// nonce, _ = nextNonce()
 			resp, err := s.buildRotateResponse(rotateRequest)
 			if err != nil {
 				return
@@ -208,8 +231,10 @@ func (s *sdsservice) Close() {
 
 func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *discovery.DiscoveryResponse, err error) {
 	resp = &discovery.DiscoveryResponse{
-		TypeUrl:     req.TypeUrl,
-		VersionInfo: req.VersionInfo,
+		TypeUrl: req.TypeUrl,
+		// if first request, versionInfo and Nonce is empty
+		VersionInfo: versionInfo,
+		Nonce:       nonce,
 	}
 	for _, resourceName := range req.ResourceNames {
 		// TODO: Encapsulate these functions and do the following steps:
@@ -242,10 +267,6 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		} else {
 			cert = ns.CertificateChain
 		}
-		// TODO: Add K8s CSR watcher and get signed cert from kubeclient
-		// SubmitCSR and watch
-		// k8scsr, err := s.sdsClient.Kube().CertificatesV1().CertificateSigningRequests().Get(context.TODO(), resourceName, metav1.GetOptions{})
-		// cert = k8scsr.Status.Certificate
 
 		secret := &tlsv3.Secret{
 			Name: resourceName,
@@ -269,6 +290,11 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			Name:     resourceName,
 			Resource: res,
 		}))
+		resp.Nonce = nonce
+		s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
+			VersionInfo: versionInfo,
+			Nonce:       nonce,
+		}
 	}
 
 	log.Info("DEBUG SDS Resp: ", resp)
@@ -365,6 +391,43 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 		// }
 	}
 	return cert, nil
+}
+
+// shouldResponse determines if the sds server will build response,
+// Only the first request will build response, and ACK/NACK will not return response
+func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
+	if req.GetErrorDetail() != nil {
+		log.Warnf("DEBUG: Request's Detail is not nil: %v", req.ErrorDetail.Message)
+		return false
+	}
+
+	if req.GetVersionInfo() == "" && req.GetResponseNonce() == "" {
+		log.Infof("Received new request, build response now")
+		return true
+	}
+
+	if req.GetVersionInfo() == "" && req.GetResponseNonce() != "" {
+		log.Warnf("Received NACK, response rejected")
+		return false
+	}
+
+	if req.GetVersionInfo() != "" && req.GetResponseNonce() != "" {
+		// reqest is ACK fomart, check VersionInfo and Nonce
+		for _, name := range req.ResourceNames {
+			if s.VersionInfoandNonce[name].Nonce != req.ResponseNonce {
+				log.Warnf("Requset ResponseNonce not match, want %v, but get %v", s.VersionInfoandNonce[name].Nonce, req.ResponseNonce)
+			}
+			if s.VersionInfoandNonce[name].VersionInfo != req.VersionInfo {
+				log.Warnf("Requset VersionInfo not match, want %v, but get %v", s.VersionInfoandNonce[name].VersionInfo, req.VersionInfo)
+			}
+		}
+		log.Infof("Get ACK Response from client, handshake done")
+		log.Infof(req.VersionInfo)
+		log.Infof(req.ResponseNonce)
+		return false
+	}
+	log.Info("First Request, building response now")
+	return true
 }
 
 // toEnvoyWorkloadSecret add generated cert and sgx configs to tls.Secret
@@ -499,4 +562,13 @@ func MessageToAnyWithError(msg proto.Message) (*anypb.Any, error) {
 		TypeUrl: "type.googleapis.com/" + string(msg.ProtoReflect().Descriptor().FullName()),
 		Value:   b,
 	}, nil
+}
+
+func nextNonce() (string, error) {
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", errs.Wrap(err)
+	}
+	return hex.EncodeToString(b), nil
 }
