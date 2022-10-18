@@ -109,8 +109,8 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
   # disable enclave signing inside CTK
   #   && sed -i -e '/libp11SgxEnclave.signed.so/d' ./src/p11/trusted/Makefile.am \
   && ./autogen.sh \
-  && ./configure --enable-dcap --with-token-path=/home/tcs-issuer \
-  && make && make install
+  && ./configure --enable-dcap \
+  && make -j8 && make install
 
 COPY LICENSE LICENSE
 RUN mkdir -p /usr/local/share/package-licenses \
@@ -216,7 +216,7 @@ ENV SGX_LIBRARY_PATH="/usr/local/libsgx"
 ENV SGX_TMP_LIBRARY_PATH="/usr/local/tmplibsgx"
 RUN mkdir $SGX_TMP_LIBRARY_PATH
 
-COPY --from=builder $LD_LIBRARY_PATH/libp11* $LD_LIBRARY_PATH/
+COPY --from=builder $LD_LIBRARY_PATH/ $LD_LIBRARY_PATH/
 COPY --from=builder /opt/intel /opt/intel
 COPY --from=builder /usr/bin/patchelf /usr/bin/patchelf
 COPY --from=builder $LD_LIBRARY_PATH/libp11SgxEnclave.signed.so $SGX_TMP_LIBRARY_PATH/libp11SgxEnclave.signed.so
