@@ -231,4 +231,5 @@ COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 $SGX_TMP_LI
 COPY --from=builder /usr/local/share/package-licenses /usr/local/share/package-licenses
 COPY --from=sources /usr/local/share/package-sources /usr/local/share/package-sources
 
+USER 1337:1337
 ENTRYPOINT ["/sds/sds-server"]

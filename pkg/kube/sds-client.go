@@ -86,16 +86,16 @@ const resyncInterval = 0
 type SdsClient struct {
 	config     *rest.Config
 	restClient *rest.RESTClient
- 
+
 	extSet      kubeExtClient.Interface
 	extInformer kubeExtInformers.SharedInformerFactory
- 
+
 	kube         kubernetes.Interface
 	kubeInformer informers.SharedInformerFactory
- 
+
 	istio         istioclient.Interface
 	istioInformer istioinformer.SharedInformerFactory
- 
+
 	gatewayapi         gatewayapiclient.Interface
 	gatewayapiInformer gatewayapiinformer.SharedInformerFactory
 
@@ -109,7 +109,7 @@ type SdsClient struct {
 
 // NewSDSClient creates a Kubernetes client from the given rest config.
 func NewSDSClient(clientConfig clientcmd.ClientConfig) (Client, error) {
-	return newSDSClientInternal(newSDSClientFactory(clientConfig, true), "")
+	return newSDSClientInternal(newSDSClientFactory(clientConfig, false), "")
 }
 
 // newSDSClientInternal creates a Kubernetes client from the given factory.

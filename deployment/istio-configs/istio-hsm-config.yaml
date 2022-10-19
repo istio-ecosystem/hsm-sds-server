@@ -80,6 +80,12 @@ spec:
                 mountPath: /usr/local/libsgx
               - name: istio-podinfo
                 mountPath: /etc/istio/pod
+              - name: istio-token
+                mountPath: /var/run/secrets/tokens
+              - name: istiod-ca-cert
+                mountPath: /var/run/secrets/istio
+              - name: istio-data
+                mountPath: /var/lib/istio/data
             - name: istio-proxy
               volumeMounts:
               - name: sds-server

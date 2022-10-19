@@ -17,10 +17,9 @@ rules:
   verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: sleep
-  namespace: istio-system
 subjects:
 - kind: ServiceAccount
   name: sleep
@@ -62,7 +61,7 @@ spec:
         inject.istio.io/templates: "sidecar,custom"
     spec:
       terminationGracePeriodSeconds: 0
-      serviceAccount: sleep
+      serviceAccountName: sleep
       containers:
       - name: sleep
         image: curlimages/curl
