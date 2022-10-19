@@ -81,7 +81,7 @@ import (
 )
 
 const (
-	SgxLibrary                 = "/usr/local/lib/libp11sgx.so"
+	SgxLibrary                 = "/usr/local/libsgx/libp11sgx.so"
 	DefaultTokenLabel          = "HSMSDSServer"
 	HSMKeyLabel                = "default"
 	DefaultHSMSoPin            = "HSMSoPin"

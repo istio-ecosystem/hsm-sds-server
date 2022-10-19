@@ -39,6 +39,9 @@ spec:
     sidecarInjectorWebhook:
       templates:
         custom: |
+          metadata:
+            annotations:
+              sgx.intel.com/quote-provider: aesmd
           spec:
             containers:
             - name: testsds
@@ -52,6 +55,17 @@ spec:
                     - "-c"
                     - |-
                       ./copylib.sh && /sds/sds-server wait
+              resources:
+                limits:
+                  cpu: 200m
+                  memory: 50Mi
+                  sgx.intel.com/enclave: 1
+                  sgx.intel.com/epc: 1Mi
+                requests:
+                  cpu: 200m
+                  memory: 50Mi
+                  sgx.intel.com/enclave: 1
+                  sgx.intel.com/epc: 1Mi    
               env:
               - name: MOCKSDS
                 value: mock-sds-server
@@ -74,6 +88,17 @@ spec:
                 mountPath: /var/run/secrets/credential-uds
               - name: sgx-libraries
                 mountPath: /usr/local/libsgx
+              resources:
+                limits:
+                  cpu: 200m
+                  memory: 50Mi
+                  sgx.intel.com/enclave: 1
+                  sgx.intel.com/epc: 1Mi
+                requests:
+                  cpu: 200m
+                  memory: 50Mi
+                  sgx.intel.com/enclave: 1
+                  sgx.intel.com/epc: 1Mi 
               env:
               - name: GREETING
                 value: hello-world
