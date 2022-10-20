@@ -71,7 +71,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	gatewaySelector := labels.Instance(gwSeletor)
 	log.Infof("This sds server gatewaySelector: %v", gatewaySelector)
 	log.Infof("This sds server gwPodLabel: %v", gw.gwPodLabel)
-	if gw.gwPodLabel.SubsetOf(gatewaySelector) {
+	if gatewaySelector.SubsetOf(gw.gwPodLabel) {
 		log.Infof("This sds server pod is the selected sds server pod with selector: %v", gatewaySelector)
 		gwServers := gwAPICR.GetServers()
 		for _, gwServer := range gwServers {
@@ -204,6 +204,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			Namespace: ns,
 		},
 		Spec: quoteapi.QuoteAttestationSpec{
+			Type:         quoteapi.QuoteAttestationRequestType(quoteapi.RequestTypeKeyProvisioning),
 			Quote:        quote,
 			QuoteVersion: DefaultQuoteVersion,
 			SignerName:   signerName,
@@ -226,6 +227,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 	if err == nil {
 		quoteAttestation := cr.DeepCopy()
 		quoteAttestation.Spec = quoteapi.QuoteAttestationSpec{
+			Type:         quoteapi.QuoteAttestationRequestType(quoteapi.RequestTypeKeyProvisioning),
 			Quote:        quote,
 			QuoteVersion: DefaultQuoteVersion,
 			SignerName:   signerName,

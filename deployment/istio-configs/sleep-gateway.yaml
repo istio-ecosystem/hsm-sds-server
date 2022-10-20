@@ -4,8 +4,7 @@ metadata:
   name: testuds-gateway
 spec:
   selector:
-    istio:   ingressgateway
-    app:     testuds 
+    app: sleep
   servers:
   - port:
       number: 443 

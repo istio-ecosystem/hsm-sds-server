@@ -74,6 +74,7 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		log.Errorf("Reconcile: unable to fetch Quote Attestation CR %s under the namespace %s : %v", req.Name, req.Namespace, err)
 		return err
 	}
+	return nil
 	var statusErr error
 	if qaObj.ObjectMeta.DeletionTimestamp.IsZero() {
 		log.Info("checking quoteattestation status")
@@ -97,14 +98,14 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		signer := qaObj.Spec.SignerName
 		secretName := qaObj.Spec.SecretName
 		var caSecretName string
-		
+
 		log.Info("using KMRA based secret.")
 		if caSecretName, err = qa.loadKMRASecret(qa.kubeClient, secretName, signer, req.Namespace); err != nil {
 			log.Error(err, "failed to load private key for signer ", signer)
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
-		
+
 		log.Info("Need to fetch the secret [%s]", caSecretName)
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
