@@ -3,9 +3,9 @@ kind: IstioOperator
 metadata:
   name: istio
 spec:
-  # profile: minimal
-  # hub: "istio"
-  # tag: "latest"
+  profile: default
+  hub: "istio"
+  tag: "1.15-dev"
   meshConfig:
     defaultConfig:
       proxyMetadata:
@@ -86,6 +86,8 @@ spec:
                 mountPath: /var/run/secrets/istio
               - name: istio-data
                 mountPath: /var/lib/istio/data
+              - name: ctk-tokens
+                mountPath: /opt/intel/cryptoapitoolkit/tokens
             - name: istio-proxy
               volumeMounts:
               - name: sds-server
@@ -94,6 +96,8 @@ spec:
                 mountPath: /var/run/secrets/credential-uds
               - name: sgx-libraries
                 mountPath: /usr/local/libsgx
+              - name: ctk-tokens
+                mountPath: /opt/intel/cryptoapitoolkit/tokens
               resources:
                 limits:
                   cpu: 200m
@@ -119,4 +123,6 @@ spec:
               name: credential-socket
             - emptyDir:
               name: sgx-libraries
+            - emptyDir:
+              name: ctk-tokens
 

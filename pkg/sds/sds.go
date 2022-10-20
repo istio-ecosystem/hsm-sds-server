@@ -3,6 +3,7 @@ package sds
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -363,34 +364,73 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 		}
 		// SetcsrBytes and wait for third part CA signed certificate
 		s.st.Cache.SetcsrBytes(csrBytes)
-		k8scsr, err := s.CreateK8sCSR(csrBytes, resourceName)
+		_, err = s.CreateK8sCSR(csrBytes, resourceName)
 		if err != nil {
 			return nil, err
 		}
-		for i := 0; i < security.MAXRetryTime; i++ {
-			// Waiting for signed CSR object and get cert from spec
-			if k8scsr.Status.Certificate != nil {
-				log.Info("Get signed certificate from CSR object")
-				return k8scsr.Status.Certificate, nil
-			}
-			// 500ms
-			time.Sleep(time.Millisecond * 500)
-		}
+
 		// Else self-sign a cert
-		// signerCert, err := security.ParsePemEncodedCertificate(s.st.Cache.GetRoot())
+		signerCert, err := security.ParsePemEncodedCertificate(s.st.Cache.GetRoot())
+		if err != nil {
+			return nil, fmt.Errorf("failed get signer cert from cache %v", err)
+		}
+		if signerCert != nil {
+			s.st.ConfigOptions.SignerCert = signerCert
+		}
+		cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
+			[]x509.ExtKeyUsage{})
+		if err != nil {
+			return nil, fmt.Errorf("failed Create New Certificate: %v", err)
+		}
+
+		x509cert, _ := security.ParsePemEncodedCertificate(cert)
+		secretItem := &security.SecretItem{
+			ResourceName:     resourceName,
+			CertificateChain: cert,
+			RootCert:         s.st.Cache.GetRoot(),
+			CreatedTime:      x509cert.NotBefore,
+			ExpireTime:       x509cert.NotAfter,
+		}
+		s.st.Cache.SetWorkload(secretItem)
+		return cert, nil
+		// TODO: approve this csr manually
+		// patch := client.MergeFrom(k8scsr.DeepCopy())
+
+		// k8scsr.Status.Conditions = append(k8scsr.Status.Conditions, certv1.CertificateSigningRequestCondition{
+		// 	Type:           certv1.CertificateApproved,
+		// 	Reason:         "User activation",
+		// 	Message:        "This CSR was approved",
+		// 	LastUpdateTime: metav1.Now(),
+		// 	Status:         v1.ConditionTrue,
+		// })
+		// k8scsr, err = s.sdsClient.Kube().CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), resourceName, k8scsr, metav1.UpdateOptions{})
 		// if err != nil {
-		// 	return nil, fmt.Errorf("failed get signer cert from cache %v", err)
+		// 	log.Info("Can't Update csr approval")
+		// 	log.Info(err)
+		// 	return nil, nil
 		// }
-		// if signerCert != nil {
-		// 	s.st.ConfigOptions.SignerCert = signerCert
-		// }
-		// cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
-		// 	[]x509.ExtKeyUsage{})
+
+		// k8scsr.Status.Certificate = append(k8scsr.Status.Certificate, cert...)
+		// k8scsr, err = s.sdsClient.Kube().CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), k8scsr, metav1.UpdateOptions{})
 		// if err != nil {
-		// 	return nil, fmt.Errorf("failed Create New Certificate: %v", err)
+		// 	log.Info("Can't update csr status")
+		// 	log.Info(err)
+		// 	return nil, nil
 		// }
+		// for i := 0; i < security.MAXRetryTime; i++ {
+		// 	// Waiting for signed CSR object and get cert from spec
+		// 	if k8scsr.Status.Certificate != nil {
+		// 		log.Info("Get signed certificate from CSR object")
+		// 		return k8scsr.Status.Certificate, nil
+		// 	}
+		// 	// 500ms
+		// 	time.Sleep(time.Millisecond * 500)
+		// }
+		// return cert, nil
+
 	}
-	return cert, nil
+	log.Info("Can't get Certificate from CSR object")
+	return nil, nil
 }
 
 // shouldResponse determines if the sds server will build response,
