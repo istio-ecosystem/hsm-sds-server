@@ -214,7 +214,17 @@ ADD copylib.sh copylib.sh
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV SGX_LIBRARY_PATH="/usr/local/libsgx"
 ENV SGX_TMP_LIBRARY_PATH="/usr/local/tmplibsgx"
-RUN mkdir $SGX_TMP_LIBRARY_PATH
+RUN mkdir $SGX_TMP_LIBRARY_PATH \
+  && chmod 777 $SGX_TMP_LIBRARY_PATH
+
+ARG USERNAME=sds
+ARG USER_UID=1337
+ARG USER_GID=$USER_UID
+
+RUN groupadd --gid $USER_GID $USERNAME \
+  && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
+
+USER $USERNAME
 
 COPY --from=builder $LD_LIBRARY_PATH/ $LD_LIBRARY_PATH/
 COPY --from=builder /opt/intel /opt/intel

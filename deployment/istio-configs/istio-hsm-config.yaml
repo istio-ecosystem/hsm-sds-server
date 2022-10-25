@@ -5,7 +5,7 @@ metadata:
 spec:
   profile: default
   hub: "istio"
-  tag: "1.15-dev"
+  tag: "sds"
   meshConfig:
     defaultConfig:
       proxyMetadata:
@@ -58,12 +58,12 @@ spec:
               resources:
                 limits:
                   cpu: 200m
-                  memory: 50Mi
+                  memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
                 requests:
                   cpu: 200m
-                  memory: 50Mi
+                  memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi    
               env:
@@ -101,12 +101,12 @@ spec:
               resources:
                 limits:
                   cpu: 200m
-                  memory: 50Mi
+                  memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
                 requests:
                   cpu: 200m
-                  memory: 50Mi
+                  memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi 
               env:

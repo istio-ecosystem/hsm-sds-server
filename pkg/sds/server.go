@@ -10,8 +10,8 @@ import (
 	"istio.io/pkg/log"
 
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
+	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
 )
 
 const (
@@ -76,6 +76,7 @@ func (s *Server) Start(ctx context.Context) error {
 			log.Info("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
 		}
 	}
+	// TODO: Add Gateway Listener
 	go func() {
 		s.errChan <- s.grpcWorkloadServer.Serve(s.grpcWorkloadListener)
 	}()

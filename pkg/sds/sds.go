@@ -292,10 +292,12 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			Resource: res,
 		}))
 		resp.Nonce = nonce
+		s.st.SgxctxLock.Lock()
 		s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
 			VersionInfo: versionInfo,
 			Nonce:       nonce,
 		}
+		s.st.SgxctxLock.Unlock()
 	}
 
 	log.Info("DEBUG SDS Resp: ", resp)
@@ -377,21 +379,24 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 		if signerCert != nil {
 			s.st.ConfigOptions.SignerCert = signerCert
 		}
+		s.st.SgxctxLock.Lock()
 		cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
 			[]x509.ExtKeyUsage{})
 		if err != nil {
 			return nil, fmt.Errorf("failed Create New Certificate: %v", err)
 		}
+		s.st.SgxctxLock.Unlock()
 
-		x509cert, _ := security.ParsePemEncodedCertificate(cert)
-		secretItem := &security.SecretItem{
-			ResourceName:     resourceName,
-			CertificateChain: cert,
-			RootCert:         s.st.Cache.GetRoot(),
-			CreatedTime:      x509cert.NotBefore,
-			ExpireTime:       x509cert.NotAfter,
-		}
-		s.st.Cache.SetWorkload(secretItem)
+		// x509cert, _ := security.ParsePemEncodedCertificate(cert)
+		// secretItem := &security.SecretItem{
+		// 	ResourceName:     resourceName,
+		// 	CertificateChain: cert,
+		// 	RootCert:         s.st.Cache.GetRoot(),
+		// 	CreatedTime:      x509cert.NotBefore,
+		// 	ExpireTime:       x509cert.NotAfter,
+		// }
+		log.Infof("workload certificate generated successfully.")
+		// s.st.Cache.SetWorkload(secretItem)
 		return cert, nil
 		// TODO: approve this csr manually
 		// patch := client.MergeFrom(k8scsr.DeepCopy())
@@ -429,8 +434,8 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 		// return cert, nil
 
 	}
-	log.Info("Can't get Certificate from CSR object")
-	return nil, nil
+	// log.Info("Can't get Certificate from CSR object")
+	// return nil, nil
 }
 
 // shouldResponse determines if the sds server will build response,
@@ -456,12 +461,12 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 		for _, name := range req.ResourceNames {
 			if s.VersionInfoandNonce[name].Nonce != req.ResponseNonce {
 				log.Warnf("Requset ResponseNonce not match, want %v, but get %v", s.VersionInfoandNonce[name].Nonce, req.ResponseNonce)
-			}
-			if s.VersionInfoandNonce[name].VersionInfo != req.VersionInfo {
+			} else if s.VersionInfoandNonce[name].VersionInfo != req.VersionInfo {
 				log.Warnf("Requset VersionInfo not match, want %v, but get %v", s.VersionInfoandNonce[name].VersionInfo, req.VersionInfo)
+			} else {
+				log.Infof("Get %v ACK Response from client, handshake done", req.ResourceNames)
 			}
 		}
-		log.Infof("Get ACK Response from client, handshake done")
 		log.Infof(req.VersionInfo)
 		log.Infof(req.ResponseNonce)
 		return false

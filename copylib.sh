@@ -27,7 +27,7 @@ check_rpath () {
     patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_urts.so
 }
 
-echo "Copy SGX Libs to /usr/local/libsgx/:"
+echo "Copy SGX Libs to $SGX_LIBRARY_PATH:"
 copy_libraries
 set_rpath
 check_rpath
