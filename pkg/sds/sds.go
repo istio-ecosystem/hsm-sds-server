@@ -66,6 +66,7 @@ type sdsservice struct {
 type VersionInfoandNonce struct {
 	VersionInfo string
 	Nonce       string
+	Ready       bool
 }
 
 var (
@@ -296,9 +297,16 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			Resource: res,
 		}))
 		resp.Nonce = nonce
-		s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
-			VersionInfo: versionInfo,
-			Nonce:       nonce,
+		if V, ok := s.VersionInfoandNonce[resourceName]; ok {
+			V.VersionInfo = versionInfo
+			V.Nonce = nonce
+			s.VersionInfoandNonce[resourceName] = V
+		} else {
+			s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
+				VersionInfo: versionInfo,
+				Nonce:       nonce,
+				Ready:       false,
+			}
 		}
 	}
 
@@ -440,21 +448,15 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 	// return nil, nil
 }
 
-var (
-	RootReady     bool = false
-	WorkloadReady bool = false
-)
-
 // shouldResponse determines if the sds server will build response,
 // Only the first request will build response, and ACK/NACK will not return response
 func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
-	if (req.ResourceNames[0] == security.RootCertName && RootReady) ||
-		(req.ResourceNames[0] == security.WorkloadCertName && WorkloadReady) {
-		return false
-	}
 	if _, ok := s.VersionInfoandNonce[req.ResourceNames[0]]; !ok {
 		log.Info(req.ResourceNames, " not found, should response")
 		return true
+	} else if s.VersionInfoandNonce[req.ResourceNames[0]].Ready {
+		log.Info(req.ResourceNames, " is ready")
+		return false
 	}
 
 	if req.GetVersionInfo() == "" && req.GetResponseNonce() == "" {
@@ -466,7 +468,6 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 		log.Warnf("DEBUG: Request's Detail is not nil: %v", req.ErrorDetail.Message)
 		return true
 	}
-
 	log.Info("Request resource names: ", req.ResourceNames)
 	log.Info("Request VersionInfo and Nonce: ", req.VersionInfo, req.ResponseNonce)
 	log.Info(s.VersionInfoandNonce)
@@ -482,16 +483,14 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 				log.Warnf("VersionInfo not match")
 				return true
 			}
-			if req.ResourceNames[0] == security.RootCertName {
-				RootReady = true
-			}
-			if req.ResourceNames[0] == security.WorkloadNamespace {
-				WorkloadReady = true
+			if V, ok := s.VersionInfoandNonce[req.ResourceNames[0]]; ok {
+				V.Ready = true
+				s.VersionInfoandNonce[req.ResourceNames[0]] = V
 			}
 			// return false
 		} else {
 			log.Warnf("Get NACK from :", req.ResourceNames)
-			// return false
+			return false
 		}
 	}
 	return true
