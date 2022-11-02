@@ -31,7 +31,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	sgxv3aplha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
+	sgxv3aplha "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/private_key_providers/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/csrwatcher"
@@ -71,7 +71,8 @@ type VersionInfoandNonce struct {
 var (
 	versionCounter int64
 	versionInfo    = strconv.FormatInt(versionCounter, 10)
-	nonce          string
+	// nonce          string
+	nonce, _ = nextNonce()
 )
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
@@ -159,8 +160,8 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 			}
 			if s.shouldResponse(req) {
 				s.reqch <- req
-				versionCounter++
-				nonce, _ = nextNonce()
+				// versionCounter++
+				// nonce, _ = nextNonce()
 			}
 		}
 	}()
@@ -231,6 +232,9 @@ func (s *sdsservice) Close() {
 }
 
 func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *discovery.DiscoveryResponse, err error) {
+	log.Info("Build respunse now: ", time.Now())
+	log.Info(s.VersionInfoandNonce)
+	versionCounter++
 	resp = &discovery.DiscoveryResponse{
 		TypeUrl: req.TypeUrl,
 		// if first request, versionInfo and Nonce is empty
@@ -292,12 +296,10 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			Resource: res,
 		}))
 		resp.Nonce = nonce
-		s.st.SgxctxLock.Lock()
 		s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
 			VersionInfo: versionInfo,
 			Nonce:       nonce,
 		}
-		s.st.SgxctxLock.Unlock()
 	}
 
 	log.Info("DEBUG SDS Resp: ", resp)
@@ -438,12 +440,21 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 	// return nil, nil
 }
 
+var (
+	RootReady     bool = false
+	WorkloadReady bool = false
+)
+
 // shouldResponse determines if the sds server will build response,
 // Only the first request will build response, and ACK/NACK will not return response
 func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
-	if req.GetErrorDetail() != nil {
-		log.Warnf("DEBUG: Request's Detail is not nil: %v", req.ErrorDetail.Message)
+	if (req.ResourceNames[0] == security.RootCertName && RootReady) ||
+		(req.ResourceNames[0] == security.WorkloadCertName && WorkloadReady) {
 		return false
+	}
+	if _, ok := s.VersionInfoandNonce[req.ResourceNames[0]]; !ok {
+		log.Info(req.ResourceNames, " not found, should response")
+		return true
 	}
 
 	if req.GetVersionInfo() == "" && req.GetResponseNonce() == "" {
@@ -451,27 +462,38 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 		return true
 	}
 
-	if req.GetVersionInfo() == "" && req.GetResponseNonce() != "" {
-		log.Warnf("Received NACK, response rejected")
-		return false
+	if req.GetErrorDetail() != nil {
+		log.Warnf("DEBUG: Request's Detail is not nil: %v", req.ErrorDetail.Message)
+		return true
 	}
 
-	if req.GetVersionInfo() != "" && req.GetResponseNonce() != "" {
-		// reqest is ACK fomart, check VersionInfo and Nonce
-		for _, name := range req.ResourceNames {
-			if s.VersionInfoandNonce[name].Nonce != req.ResponseNonce {
-				log.Warnf("Requset ResponseNonce not match, want %v, but get %v", s.VersionInfoandNonce[name].Nonce, req.ResponseNonce)
-			} else if s.VersionInfoandNonce[name].VersionInfo != req.VersionInfo {
-				log.Warnf("Requset VersionInfo not match, want %v, but get %v", s.VersionInfoandNonce[name].VersionInfo, req.VersionInfo)
-			} else {
-				log.Infof("Get %v ACK Response from client, handshake done", req.ResourceNames)
-			}
+	log.Info("Request resource names: ", req.ResourceNames)
+	log.Info("Request VersionInfo and Nonce: ", req.VersionInfo, req.ResponseNonce)
+	log.Info(s.VersionInfoandNonce)
+	if req.ResponseNonce != "" {
+		log.Info("Get request from ", req.ResourceNames, "Nonce: ", req.ResponseNonce)
+		if req.ResponseNonce != s.VersionInfoandNonce[req.ResourceNames[0]].Nonce {
+			log.Warnf("Nonce not match")
+			return true
 		}
-		log.Infof(req.VersionInfo)
-		log.Infof(req.ResponseNonce)
-		return false
+		if req.VersionInfo != "" {
+			log.Info("Get request from ", req.ResourceNames, "VersionInfo: ", req.VersionInfo)
+			if req.VersionInfo != s.VersionInfoandNonce[req.ResourceNames[0]].VersionInfo {
+				log.Warnf("VersionInfo not match")
+				return true
+			}
+			if req.ResourceNames[0] == security.RootCertName {
+				RootReady = true
+			}
+			if req.ResourceNames[0] == security.WorkloadNamespace {
+				WorkloadReady = true
+			}
+			// return false
+		} else {
+			log.Warnf("Get NACK from :", req.ResourceNames)
+			// return false
+		}
 	}
-	log.Info("First Request, building response now")
 	return true
 }
 

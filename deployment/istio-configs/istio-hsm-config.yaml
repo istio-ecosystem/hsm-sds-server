@@ -5,7 +5,7 @@ metadata:
 spec:
   profile: default
   hub: "istio"
-  tag: "sds"
+  tag: "sds-1102"
   meshConfig:
     defaultConfig:
       proxyMetadata:
@@ -47,23 +47,20 @@ spec:
             - name: testsds
               image: sds-server/sds-server:latest
               imagePullPolicy: IfNotPresent
+              command: ["bash", "-c", "sleep 5s; ls -la /home/istio-proxy/sgx/lib; ./sds/sds-server"]
               lifecycle:
                 postStart:
                   exec:
-                    command: 
-                    - sh
-                    - "-c"
-                    - |-
-                      ./copylib.sh && /sds/sds-server wait
+                    command: ["/bin/sh", "-c", "./home/istio-proxy/prepare.sh"]
               resources:
                 limits:
                   cpu: 200m
-                  memory: 100Mi
+                  memory: 500Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
                 requests:
                   cpu: 200m
-                  memory: 100Mi
+                  memory: 300Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi    
               env:
@@ -77,7 +74,7 @@ spec:
               - name: credential-socket
                 mountPath: /var/run/secrets/credential-uds
               - name: sgx-libraries
-                mountPath: /usr/local/libsgx
+                mountPath: /home/istio-proxy/sgx/lib
               - name: istio-podinfo
                 mountPath: /etc/istio/pod
               - name: istio-token
@@ -95,18 +92,18 @@ spec:
               - name: credential-socket
                 mountPath: /var/run/secrets/credential-uds
               - name: sgx-libraries
-                mountPath: /usr/local/libsgx
+                mountPath: /home/istio-proxy/sgx/lib
               - name: ctk-tokens
                 mountPath: /opt/intel/cryptoapitoolkit/tokens
               resources:
                 limits:
-                  cpu: 200m
-                  memory: 100Mi
+                  # cpu: 200m
+                  # memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
                 requests:
-                  cpu: 200m
-                  memory: 100Mi
+                  # cpu: 200m
+                  # memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi 
               env:

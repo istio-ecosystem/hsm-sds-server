@@ -6,18 +6,18 @@ admin:
       port_value: 12346
 static_resources:
   clusters:
-  - name: service-http
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service-http
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: service-http
-                port_value: 8000
+  # - name: service-http
+  #   type: STRICT_DNS
+  #   lb_policy: ROUND_ROBIN
+  #   load_assignment:
+  #     cluster_name: service-http
+  #     endpoints:
+  #     - lb_endpoints:
+  #       - endpoint:
+  #           address:
+  #             socket_address:
+  #               address: service-http
+  #               port_value: 8000
   - name: sds-grpc
     type: static
     typed_extension_protocol_options:
@@ -50,15 +50,15 @@ static_resources:
           stat_prefix: ingress_http
           route_config:
             name: local_route
-            virtual_hosts:
-            - name: app
-              domains:
-              - "*"
-              routes:
-              - match:
-                  prefix: "/"
-                route:
-                  cluster: service-http
+          #   virtual_hosts:
+          #   - name: app
+          #     domains:
+          #     - "*"
+              # routes:
+              # - match:
+              #     prefix: "/"
+                # route:
+                #   cluster: service-http
           http_filters:
           - name: envoy.filters.http.router
             typed_config:

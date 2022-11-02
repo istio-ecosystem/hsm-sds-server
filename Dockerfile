@@ -109,7 +109,7 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
   # disable enclave signing inside CTK
   #   && sed -i -e '/libp11SgxEnclave.signed.so/d' ./src/p11/trusted/Makefile.am \
   && ./autogen.sh \
-  && ./configure --enable-dcap \
+  && ./configure --enable-dcap  --prefix=/home/istio-proxy/sgx \
   && make -j8 && make install
 
 COPY LICENSE LICENSE
@@ -198,7 +198,7 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
 ###
 # Final sds-server Image
 ###
-FROM runtime as final
+FROM ubuntu:22.04 as final
 
 RUN mkdir /sds
 WORKDIR /sds
@@ -208,29 +208,37 @@ ADD sds-server /sds/sds-server
 WORKDIR /
 
 # RUN mkdir /usr/local/tmplibsgx
-
-ADD copylib.sh copylib.sh
-# RUN /bin/sh copylib.sh
-ENV LD_LIBRARY_PATH="/usr/local/lib"
-ENV SGX_LIBRARY_PATH="/usr/local/libsgx"
-ENV SGX_TMP_LIBRARY_PATH="/usr/local/tmplibsgx"
-RUN mkdir $SGX_TMP_LIBRARY_PATH \
-  && chmod 777 $SGX_TMP_LIBRARY_PATH
-
-ARG USERNAME=sds
+ARG USERNAME=istio-proxy
 ARG USER_UID=1337
 ARG USER_GID=$USER_UID
 
-RUN groupadd --gid $USER_GID $USERNAME \
-  && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
+RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
+  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
+  && export http_proxy=http://child-prc.intel.com:913 \
+  && export https_proxy=http://child-prc.intel.com:913 \
+  && export DEBIAN_FRONTEND=noninteractive \
+  && apt-get update && apt-get -y install opensc \ 
+  && groupadd --gid $USER_GID $USERNAME \
+  && useradd --create-home --home-dir /home/istio-proxy --uid $USER_UID --gid $USER_GID -m $USERNAME
 
-USER $USERNAME
+USER $USERNAME  
+ADD prepare.sh /home/istio-proxy/prepare.sh
+# ADD envoy-sgx /home/istio-proxy/envoy
+# ADD envoy-mtls-integreation.yaml /home/istio-proxy/envoy-mtls-integreation.yaml
+# ADD mtls-server.crt /home/istio-proxy/mtls-server.crt
+# ADD mtls-client.crt /home/istio-proxy/mtls-client.crt
+# ADD test/boot.yaml /home/istio-proxy/boot.yaml
+# RUN /bin/sh prepare.sh
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+ENV SGX_LIBRARY_PATH="/home/istio-proxy/sgx/lib"
+ENV SGX_TMP_LIBRARY_PATH="/home/istio-proxy/tmplibsgx"
+RUN mkdir $SGX_TMP_LIBRARY_PATH 
 
-COPY --from=builder $LD_LIBRARY_PATH/ $LD_LIBRARY_PATH/
+# COPY --from=builder $LD_LIBRARY_PATH/ $LD_LIBRARY_PATH/
 COPY --from=builder /opt/intel /opt/intel
 COPY --from=builder /usr/bin/patchelf /usr/bin/patchelf
-COPY --from=builder $LD_LIBRARY_PATH/libp11SgxEnclave.signed.so $SGX_TMP_LIBRARY_PATH/libp11SgxEnclave.signed.so
-COPY --from=builder $LD_LIBRARY_PATH/libp11sgx.so $SGX_TMP_LIBRARY_PATH/libp11sgx.so
+COPY --from=builder $SGX_LIBRARY_PATH/libp11SgxEnclave.signed.so $SGX_TMP_LIBRARY_PATH/libp11SgxEnclave.signed.so
+COPY --from=builder $SGX_LIBRARY_PATH/libp11sgx.so $SGX_TMP_LIBRARY_PATH/libp11sgx.so
 COPY --from=builder /lib/x86_64-linux-gnu/libsgx_dcap_ql.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_dcap_ql.so.1
 COPY --from=builder /lib/x86_64-linux-gnu/libsgx_urts.so $SGX_TMP_LIBRARY_PATH/libsgx_urts.so
 COPY --from=builder /lib/x86_64-linux-gnu/libsgx_qe3_logic.so $SGX_TMP_LIBRARY_PATH/libsgx_qe3_logic.so
@@ -241,5 +249,4 @@ COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 $SGX_TMP_LI
 COPY --from=builder /usr/local/share/package-licenses /usr/local/share/package-licenses
 COPY --from=sources /usr/local/share/package-sources /usr/local/share/package-sources
 
-USER 1337:1337
 ENTRYPOINT ["/sds/sds-server"]

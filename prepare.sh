@@ -3,7 +3,7 @@
 copy_libraries () {
     # mkdir $SGX_LIBRARY_PATH
     cp -r $SGX_TMP_LIBRARY_PATH/* $SGX_LIBRARY_PATH
-    rm -rf $SGX_TMP_LIBRARY_PATH
+    # rm -rf $SGX_TMP_LIBRARY_PATH
     echo "Copy Finished"
 }
 
@@ -24,11 +24,12 @@ check_rpath () {
     patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_enclave_common.so.1
     patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_pce_logic.so.1
     patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_qe3_logic.so
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_urts.so
+    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_urts.so 
 }
 
 echo "Copy SGX Libs to $SGX_LIBRARY_PATH:"
 copy_libraries
 set_rpath
 check_rpath
+./sds/sds-server wait
 echo "Exit Shell"
