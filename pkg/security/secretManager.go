@@ -23,6 +23,7 @@ import (
 
 const (
 	WorkloadIdentitySocketPath = "/var/run/secrets/workload-spiffe-uds/socket"
+	GatewayIdentitySocketPath  = "/var/run/secrets/credential-uds/socket"
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"

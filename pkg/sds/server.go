@@ -23,10 +23,12 @@ const (
 // Server is the gPRC server that exposes SDS through UDS.
 type Server struct {
 	workloadSds          sdsv3.SecretDiscoveryServiceServer
+	grpcGatewayListener  net.Listener
 	grpcWorkloadListener net.Listener
-	grpcWorkloadServer   *grpc.Server
+	sdsGrpcServer        *grpc.Server
 	stopped              *atomic.Bool
-	errChan              chan error
+	errGatewayChan       chan error
+	errWorkloadChan      chan error
 }
 
 // NewServer implements SDS service as envoy sdsv3.SecretDiscoveryServiceServer interface
@@ -39,7 +41,8 @@ func NewServer(kubeconfig, configContext string) *Server {
 	if sdsService != nil {
 		s = &Server{
 			stopped: atomic.NewBool(false),
-			errChan: make(chan error),
+			errGatewayChan: make(chan error),
+			errWorkloadChan: make(chan error),
 		}
 		s.workloadSds = sdsService
 	}
@@ -52,8 +55,8 @@ func (s *Server) Stop() {
 		return
 	}
 	s.stopped.Store(true)
-	if s.grpcWorkloadServer != nil {
-		s.grpcWorkloadServer.Stop()
+	if s.sdsGrpcServer != nil {
+		s.sdsGrpcServer.Stop()
 	}
 	if s.grpcWorkloadListener != nil {
 		s.grpcWorkloadListener.Close()
@@ -61,8 +64,8 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	s.grpcWorkloadServer = grpc.NewServer(s.grpcServerOptions()...)
-	sdsv3.RegisterSecretDiscoveryServiceServer(s.grpcWorkloadServer, s.workloadSds)
+	s.sdsGrpcServer = grpc.NewServer(s.grpcServerOptions()...)
+	sdsv3.RegisterSecretDiscoveryServiceServer(s.sdsGrpcServer, s.workloadSds)
 	var err error
 	s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath)
 	if err != nil {
@@ -76,17 +79,38 @@ func (s *Server) Start(ctx context.Context) error {
 			log.Info("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
 		}
 	}
-	// TODO: Add Gateway Listener
 	go func() {
-		s.errChan <- s.grpcWorkloadServer.Serve(s.grpcWorkloadListener)
+		s.errWorkloadChan <- s.sdsGrpcServer.Serve(s.grpcWorkloadListener)
+	}()
+
+	s.grpcGatewayListener, err = uds.NewListener(security.GatewayIdentitySocketPath)
+	if err != nil {
+		log.Info("gateway listen generation error ", err)
+		return err
+	}
+	log.Info("Starting gateway SDS grpc server")
+	log.Debugf("gateway Listener addr: ", s.grpcGatewayListener.Addr())
+	if s.grpcGatewayListener == nil {
+		if s.grpcGatewayListener, err = uds.NewListener(security.GatewayIdentitySocketPath); err != nil {
+			log.Info("gateway SDS grpc server for gateway failed to set up UDS: ", err)
+		}
+	}
+	go func() {
+		s.errGatewayChan <- s.sdsGrpcServer.Serve(s.grpcGatewayListener)
 	}()
 
 	select {
-	case err = <-s.errChan:
+	case err = <-s.errWorkloadChan:
 		log.Warnf("SDS grpc server for workload proxies failed to run: ", err)
+	case err = <-s.errWorkloadChan:
+		log.Warnf("SDS grpc server for gateway failed to run: ", err)
 	case <-ctx.Done():
 		log.Info("Stopping Workload and SDS APIs")
-		err = <-s.errChan
+		err = <-s.errWorkloadChan
+		if errors.Is(err, grpc.ErrServerStopped) {
+			err = nil
+		}
+		err = <-s.errGatewayChan
 		if errors.Is(err, grpc.ErrServerStopped) {
 			err = nil
 		}
