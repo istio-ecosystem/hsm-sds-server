@@ -31,7 +31,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	sgxv3aplha "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/private_key_providers/sgx/v3alpha"
+	// sgxv3alpha "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/private_key_providers/sgx/v3alpha"
+	sgxv3alpha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/csrwatcher"
@@ -324,7 +325,7 @@ func (s *sdsservice) registerSecret(item security.SecretItem, resourceName strin
 		return
 	}
 	s.st.Cache.SetWorkload(&item)
-	log.Info(resourceName, ": scheduled certificate for rotation in %v", delay)
+	log.Info(resourceName, ": scheduled certificate for rotation in ", delay)
 
 	s.st.DelayQueue.PushDelayed(func() error {
 		// Clear the cache so the next call generates a fresh certificate
@@ -460,7 +461,7 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 	}
 
 	if req.GetVersionInfo() == "" && req.GetResponseNonce() == "" {
-		log.Infof("Received new request, build response now")
+		log.Infof(req.ResourceNames, " Received new request, build response now")
 		return true
 	}
 
@@ -498,7 +499,7 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 
 // toEnvoyWorkloadSecret add generated cert and sgx configs to tls.Secret
 func (s *sdsservice) toEnvoyWorkloadSecret(secret *tlsv3.Secret, cert []byte) {
-	conf := MessageToAny(&sgxv3aplha.SgxPrivateKeyMethodConfig{
+	conf := MessageToAny(&sgxv3alpha.SgxPrivateKeyMethodConfig{
 		SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
 		KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
 		UsrPin:     s.st.SgxConfigs.HSMUserPin,

@@ -12,6 +12,18 @@ kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-hsm.ya
 
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-gateway.yaml )
 
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml )
+
+# dump config
+ps -ef | grep envoy
+
+sudo nsenter -t {envoy pid } -n
+
+curl localhost:15000/config_dump > .json
+
+kubectl exec "$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})" -c istio-proxy -- curl -v -s http://httpbin.default:8000/headers
+
+kubectl exec $(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name}) -c istio-proxy -- curl -s http://httpbin.default:8000/headers -o /dev/null -s -w '%{http_code}\n'
 
 # Clean up
 istioctl x uninstall --purge -y
@@ -19,6 +31,8 @@ istioctl x uninstall --purge -y
 kubectl delete -f deployment/istio-configs/sleep-hsm.yaml
 
 kubectl delete -f deployment/istio-configs/sleep-gateway.yaml
+
+kubectl delete -f deployment/istio-configs/httpbin-hsm.yaml
 
 kubectl get po
 
