@@ -371,7 +371,7 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 			return nil, fmt.Errorf("%v cert not found", resourceName)
 		}
 	} else {
-		csrBytes, err := s.st.GenerateCSR(*s.st.ConfigOptions)
+		csrBytes, err := s.st.GenerateCSR(*s.st.ConfigOptions, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
 		}

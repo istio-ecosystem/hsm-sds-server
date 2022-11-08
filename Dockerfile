@@ -198,7 +198,7 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
 ###
 # Final sds-server Image
 ###
-FROM ubuntu:22.04 as final
+FROM runtime as final
 
 RUN mkdir /sds
 WORKDIR /sds

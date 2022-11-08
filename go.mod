@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/ThalesIgnite/crypto11 v1.2.5
 	github.com/cenkalti/backoff/v4 v4.1.3
+	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa
 	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935
 	github.com/go-logr/logr v1.2.3
 	github.com/hashicorp/go-multierror v1.1.1
@@ -47,7 +48,6 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5 // indirect
-	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect

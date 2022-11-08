@@ -46,12 +46,13 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 		log.Warnf("Can't init sgx Context: ", err)
 		return nil, err
 	}
-	st.SgxctxLock.Unlock()
 	if err = st.SgxContext.InitializeKey(st.SgxConfigs.HSMKeyLabel, st.SgxConfigs.HSMKeyType, security.DefaultRSAKeysize); err != nil {
 		log.Warnf("failed to create default private key via sgx: ", err)
 		return nil, err
 	}
-	csrPem, err := st.GenerateCSR(*options)
+	st.SgxctxLock.Unlock()
+
+	csrPem, err := st.GenerateCSR(*options, true)
 	if err != nil {
 		log.Info("failed to generate Kubernetes CSR: ", err)
 		return nil, err

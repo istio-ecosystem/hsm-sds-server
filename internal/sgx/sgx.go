@@ -2,7 +2,7 @@ package sgx
 
 /*
 #cgo CFLAGS: -g -Wall -I /usr/local/include
-#cgo LDFLAGS: -lp11sgx -L /usr/local/lib
+#cgo LDFLAGS: -lp11sgx -L /home/istio-proxy/sgx/lib
 
 #include <cryptoki.h>
 #include <stdlib.h>
@@ -514,6 +514,10 @@ func (ctx *SgxContext) RemoveKey(keyLabel string) error {
 }
 
 func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
+	if ctx.ctkQuote != nil {
+		log.Infof("SGX Quote already generated")
+		return nil
+	}
 	pub, priv, err := generateP11KeyPair(ctx.p11Ctx, ctx.p11Session)
 	if err != nil {
 		ctx.Destroy()
@@ -523,7 +527,6 @@ func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
 	ctx.quotePrvKey = priv
 
 	quote, err := generateQuote(ctx.p11Ctx, ctx.p11Session, pub)
-	//quote := []byte("aaaa")
 	if err != nil {
 		ctx.p11Ctx.Destroy()
 		return fmt.Errorf("call to generateQuote failed %s", err)
@@ -547,6 +550,7 @@ func generateQuote(p11Ctx *pkcs11.Ctx, p11Session pkcs11.SessionHandle, pubKey p
 	//	l.V(3).Info("Wrapping key....")
 	quotePubKey, err := p11Ctx.WrapKey(p11Session, []*pkcs11.Mechanism{m}, pkcs11.ObjectHandle(0), pubKey)
 	if err != nil {
+		log.Warnf(err)
 		return nil, err
 	}
 

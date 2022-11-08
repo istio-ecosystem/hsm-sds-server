@@ -196,7 +196,7 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 			return nil, fmt.Errorf("%v cert not found", resourceName)
 		}
 	} else {
-		csrBytes, err := sc.GenerateCSR(*sc.ConfigOptions)
+		csrBytes, err := sc.GenerateCSR(*sc.ConfigOptions, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
 		}
@@ -218,8 +218,10 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 	return cert, nil
 }
 
-func (sc *SecretManager) GenerateCSR(options CertOptions) ([]byte, error) {
+func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension bool) ([]byte, error) {
 
+	var template *x509.CertificateRequest
+	var err error
 	csrHostName := &SPIFFEIdentity{
 		TrustDomain:    TrustDomain,
 		Namespace:      WorkloadNamespace,
@@ -227,12 +229,31 @@ func (sc *SecretManager) GenerateCSR(options CertOptions) ([]byte, error) {
 	}
 
 	options.Host = csrHostName.String()
+	if needQuoteExtension {
+		if err = sc.SgxContext.GenerateQuoteAndPublicKey(); err != nil {
+			return nil, fmt.Errorf("failed to generate sgx quote and public key %s", err)
+		}
+		quote, err := sc.SgxContext.Quote()
+		if err != nil {
+			return nil, fmt.Errorf("get sgx quote error %s", err)
+		}
 
-	template, err := GenCSRTemplate(options)
-	if err != nil {
-		return nil, fmt.Errorf("CSR template creation failed (%v)", err)
+		quotePubKey, err := sc.SgxContext.QuotePublicKey()
+		if err != nil {
+			return nil, fmt.Errorf("get quote public key error %s", err)
+		}
+		template, err = GenCSRTemplate(options, quote, quotePubKey, true)
+		if err != nil {
+			return nil, fmt.Errorf("CSR template creation failed (%v)", err)
+		}
+	} else {
+		template, err = GenCSRTemplate(options, nil, nil, false)
+		if err != nil {
+			return nil, fmt.Errorf("CSR template creation failed (%v)", err)
+		}
 	}
-	log.Info("DEBUG Template:", template)
+
+	log.Info("CSR template generated")
 	var privKey crypto.Signer
 
 	cryptoctx, err := sc.SgxContext.GetCryptoContext()
@@ -370,7 +391,7 @@ func (sc *SecretManager) RegisterSecretHandler(h func(resourceName string)) {
 }
 
 // GenCSRTemplate generates a certificateRequest template with the given options.
-func GenCSRTemplate(options CertOptions) (*x509.CertificateRequest, error) {
+func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, needQuoteExtension bool) (*x509.CertificateRequest, error) {
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			Organization: []string{options.Org},
@@ -386,7 +407,11 @@ func GenCSRTemplate(options CertOptions) (*x509.CertificateRequest, error) {
 		template.ExtraExtensions = []pkix.Extension{*s}
 	}
 
-	// TODO: Add Quote Extension
+	// Build sgx quote extension here
+	if needQuoteExtension {
+		s, _ := BuildQuoteExtension(quote, quotePubKey)
+		template.ExtraExtensions = append(template.ExtraExtensions, *s)
+	}
 
 	return template, nil
 }
