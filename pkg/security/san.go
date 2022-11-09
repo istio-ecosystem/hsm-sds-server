@@ -46,8 +46,9 @@ var (
 
 	// The OID for the SAN extension (See
 	// http://www.alvestrand.no/objectid/2.5.29.17.html).
-	oidSubjectAlternativeName    = asn1.ObjectIdentifier{2, 5, 29, 17}
-	oidSubjectQuoteExtensionName = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1283}
+	oidSubjectAlternativeName     = asn1.ObjectIdentifier{2, 5, 29, 17}
+	oidSubjectQuoteExtensionName  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1283}
+	oidSubjectPubkeyExtensionName = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1284}
 )
 
 // Identity is an object holding both the encoded identifier bytes as well as
@@ -187,7 +188,7 @@ func generateReversedMap(m map[IdentityType]int) map[int]IdentityType {
 }
 
 // BuildQuoteExtension builds the SGX Quote extension for the certificate.
-func BuildQuoteExtension(Quote []byte, QuotePubKey []byte) (*pkix.Extension, error) {
+func BuildQuoteExtension(Quote []byte) (*pkix.Extension, error) {
 	val := []asn1.RawValue{}
 
 	val = append(val, asn1.RawValue{
@@ -195,6 +196,18 @@ func BuildQuoteExtension(Quote []byte, QuotePubKey []byte) (*pkix.Extension, err
 		Class: asn1.ClassUniversal,
 		Tag:   asn1.TagUTF8String,
 	})
+
+	bs, err := asn1.Marshal(val)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal the raw values for SGX field (err: %s)", err)
+	}
+
+	return &pkix.Extension{Id: oidSubjectQuoteExtensionName, Critical: false, Value: bs}, nil
+}
+
+// BuildPubkeyExtension builds the SGX Quote Publickey extension for the certificate.
+func BuildPubkeyExtension(QuotePubKey []byte) (*pkix.Extension, error) {
+	val := []asn1.RawValue{}
 
 	val = append(val, asn1.RawValue{
 		Bytes: QuotePubKey,
@@ -207,5 +220,5 @@ func BuildQuoteExtension(Quote []byte, QuotePubKey []byte) (*pkix.Extension, err
 		return nil, fmt.Errorf("failed to marshal the raw values for SGX field (err: %s)", err)
 	}
 
-	return &pkix.Extension{Id: oidSubjectQuoteExtensionName, Critical: false, Value: bs}, nil
+	return &pkix.Extension{Id: oidSubjectPubkeyExtensionName, Critical: false, Value: bs}, nil
 }

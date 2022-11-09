@@ -409,8 +409,10 @@ func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, needQ
 
 	// Build sgx quote extension here
 	if needQuoteExtension {
-		s, _ := BuildQuoteExtension(quote, quotePubKey)
+		s, _ := BuildQuoteExtension(quote)
 		template.ExtraExtensions = append(template.ExtraExtensions, *s)
+		p, _ := BuildPubkeyExtension(quotePubKey)
+		template.ExtraExtensions = append(template.ExtraExtensions, *p)
 	}
 
 	return template, nil
