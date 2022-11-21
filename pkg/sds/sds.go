@@ -54,8 +54,6 @@ const (
 type sdsservice struct {
 	st                  *security.SecretManager
 	stop                chan struct{}
-	reqch               chan *discovery.DiscoveryRequest
-	respch              chan *discovery.DiscoveryResponse
 	pushch              chan string
 	VersionInfoandNonce map[string]VersionInfoandNonce
 	sdsClient           kube.Client
@@ -67,14 +65,12 @@ type sdsservice struct {
 type VersionInfoandNonce struct {
 	VersionInfo string
 	Nonce       string
-	Ready       bool
 }
 
 var (
 	versionCounter int64
 	versionInfo    = strconv.FormatInt(versionCounter, 10)
-	// nonce          string
-	nonce, _ = nextNonce()
+	nonce, _       = nextNonce()
 )
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
@@ -91,8 +87,6 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 	if st != nil && err == nil {
 		sdsSvc = &sdsservice{
 			stop:                make(chan struct{}),
-			reqch:               make(chan *discovery.DiscoveryRequest, 1),
-			respch:              make(chan *discovery.DiscoveryResponse, 1),
 			pushch:              make(chan string, 1),
 			VersionInfoandNonce: make(map[string]VersionInfoandNonce),
 		}
@@ -145,11 +139,13 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 }
 
 func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSecretsServer) error {
-	// TODO: Authenticate the stream context before handle it
-	// identitys, err := s.Authenticate(stream.Context())
 	log.Info("DEBUG: StreamSecret called")
 	var err error
+	reqch := make(chan *discovery.DiscoveryRequest, 1)
+	respch := make(chan *discovery.DiscoveryResponse, 1)
 	errch := make(chan error, 1)
+
+	// For receiving
 	go func() {
 		for {
 			req, err := stream.Recv()
@@ -161,17 +157,19 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 				return
 			}
 			if s.shouldResponse(req) {
-				s.reqch <- req
+				reqch <- req
 				// versionCounter++
 				// nonce, _ = nextNonce()
 			}
 		}
 	}()
+
+	// For building response
 	var lastReq *discovery.DiscoveryRequest
 	go func() {
 		for {
 			select {
-			case newReq := <-s.reqch:
+			case newReq := <-reqch:
 				s.st.SgxctxLock.Lock()
 				if s.st.SgxContext == nil {
 					s.st.SgxContext, _ = sgx.NewContext(sgx.Config{
@@ -185,33 +183,34 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 				}
 				s.st.SgxctxLock.Unlock()
 				lastReq = newReq
-			case err = <-errch:
+			case err := <-errch:
+				log.Warnf("Got Error: ", err)
 				return
 			}
 			resp, err := s.buildResponse(lastReq)
-			s.respch <- resp
 			if err != nil {
+				log.Warnf("Build response failed")
 				return
 			}
+			respch <- resp
 		}
 	}()
 
-	// used for workload certificate rotation
+	// For workload certificate rotation
 	go func() {
 		for {
 			rotateRequest := <-s.pushch
-			// versionCounter++
-			// nonce, _ = nextNonce()
 			resp, err := s.buildRotateResponse(rotateRequest)
 			if err != nil {
 				return
 			}
-			s.respch <- resp
+			respch <- resp
 		}
 	}()
 
+	// For sending response (Both resp and rotation resp)
 	for {
-		err = stream.Send(<-s.respch)
+		err = stream.Send(<-respch)
 		if err != nil {
 			return err
 		}
@@ -228,8 +227,6 @@ func (s *sdsservice) FetchSecrets(ctx context.Context, discReq *discovery.Discov
 
 func (s *sdsservice) Close() {
 	close(s.stop)
-	close(s.reqch)
-	close(s.respch)
 	close(s.pushch)
 }
 
@@ -306,7 +303,6 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
 				VersionInfo: versionInfo,
 				Nonce:       nonce,
-				Ready:       false,
 			}
 		}
 	}
@@ -339,19 +335,44 @@ func (s *sdsservice) registerSecret(item security.SecretItem, resourceName strin
 // buildRotateResponse build the rotateResponse from rotateRequest in push channel
 func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.DiscoveryResponse, error) {
 	log.Infof("DEBUG: Build certificate rotation response now")
-	resp := &discovery.DiscoveryResponse{}
 	secret := &tlsv3.Secret{
 		Name: resourceName,
 	}
-	// cert, _ := s.st.GenerateSecret(resourceName)
-	cert, _ := s.GenCSRandGetCert(resourceName)
+	resp := &discovery.DiscoveryResponse{
+		VersionInfo: versionInfo,
+		Nonce:       nonce,
+	}
+	cert, err := s.GenCSRandGetCert(resourceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed Create Certificate %v", err)
+	}
+	secretItem := security.SecretItem{
+		ResourceName:     resourceName,
+		CertificateChain: cert,
+		RootCert:         s.st.Cache.GetRoot(),
+		CreatedTime:      time.Now(),
+		ExpireTime:       time.Now().Add(time.Hour * 24),
+	}
+	// register the new generated secret
+	s.registerSecret(secretItem, resourceName)
 	s.toEnvoyWorkloadSecret(secret, cert)
 	res := MessageToAny(secret)
 	resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
 		Name:     resourceName,
 		Resource: res,
 	}))
+	if V, ok := s.VersionInfoandNonce[resourceName]; ok {
+		V.VersionInfo = versionInfo
+		V.Nonce = nonce
+		s.VersionInfoandNonce[resourceName] = V
+	} else {
+		s.VersionInfoandNonce[resourceName] = VersionInfoandNonce{
+			VersionInfo: versionInfo,
+			Nonce:       nonce,
+		}
+	}
 	log.Infof("DEBUG: workload certificate updated successfully.")
+	log.Info("DEBUG Rotate resp: ", resp)
 	return resp, nil
 }
 
@@ -452,49 +473,19 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 // shouldResponse determines if the sds server will build response,
 // Only the first request will build response, and ACK/NACK will not return response
 func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
-	if _, ok := s.VersionInfoandNonce[req.ResourceNames[0]]; !ok {
-		log.Info(req.ResourceNames, " not found, should response")
+	if req.GetResponseNonce() == "" {
+		log.Info("DEBUG Envoy Request nonce is none, need response")
 		return true
-	} else if s.VersionInfoandNonce[req.ResourceNames[0]].Ready {
-		log.Info(req.ResourceNames, " is ready")
+	} else if (req.GetErrorDetail() != nil) || (req.VersionInfo != s.VersionInfoandNonce[req.ResourceNames[0]].VersionInfo) {
+		log.Warnf("Get NACK from Envoy: ", req.GetErrorDetail().GetMessage())
+		nonce, _ = nextNonce()
+		versionCounter++
+		return false
+	} else {
+		log.Info("Get ACK from Envoy successfully , no response")
 		return false
 	}
 
-	if req.GetVersionInfo() == "" && req.GetResponseNonce() == "" {
-		log.Infof(req.ResourceNames, " Received new request, build response now")
-		return true
-	}
-
-	if req.GetErrorDetail() != nil {
-		log.Warnf("DEBUG: Request's Detail is not nil: %v", req.ErrorDetail.Message)
-		return true
-	}
-	log.Info("Request resource names: ", req.ResourceNames)
-	log.Info("Request VersionInfo and Nonce: ", req.VersionInfo, req.ResponseNonce)
-	log.Info(s.VersionInfoandNonce)
-	if req.ResponseNonce != "" {
-		log.Info("Get request from ", req.ResourceNames, "Nonce: ", req.ResponseNonce)
-		if req.ResponseNonce != s.VersionInfoandNonce[req.ResourceNames[0]].Nonce {
-			log.Warnf("Nonce not match")
-			return true
-		}
-		if req.VersionInfo != "" {
-			log.Info("Get request from ", req.ResourceNames, "VersionInfo: ", req.VersionInfo)
-			if req.VersionInfo != s.VersionInfoandNonce[req.ResourceNames[0]].VersionInfo {
-				log.Warnf("VersionInfo not match")
-				return true
-			}
-			if V, ok := s.VersionInfoandNonce[req.ResourceNames[0]]; ok {
-				V.Ready = true
-				s.VersionInfoandNonce[req.ResourceNames[0]] = V
-			}
-			// return false
-		} else {
-			log.Warnf("Get NACK from :", req.ResourceNames)
-			return false
-		}
-	}
-	return true
 }
 
 // toEnvoyWorkloadSecret add generated cert and sgx configs to tls.Secret
