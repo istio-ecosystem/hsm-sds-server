@@ -21,11 +21,11 @@ package externalversions
 import (
 	reflect "reflect"
 	sync "sync"
-	"time"
+	time "time"
 
 	versioned "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
-	tcs "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/tcs"
 	internalinterfaces "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
+	tcs "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/tcs"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,9 +172,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	TCS() tcs.Interface
+	Tcs() tcs.Interface
 }
 
-func (f *sharedInformerFactory) TCS() tcs.Interface {
+func (f *sharedInformerFactory) Tcs() tcs.Interface {
 	return tcs.New(f, f.namespace, f.tweakListOptions)
 }

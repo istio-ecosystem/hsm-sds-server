@@ -57,7 +57,7 @@ type quoteAttestations struct {
 }
 
 // newQuoteAttestations returns a QuoteAttestations
-func newQuoteAttestations(c *TCSV1alpha1Client, namespace string) *quoteAttestations {
+func newQuoteAttestations(c *TcsV1alpha1Client, namespace string) *quoteAttestations {
 	return &quoteAttestations{
 		client: c.RESTClient(),
 		ns:     namespace,

@@ -32,7 +32,7 @@ import (
 
 // FakeQuoteAttestations implements QuoteAttestationInterface
 type FakeQuoteAttestations struct {
-	Fake *FakeTCSV1alpha1
+	Fake *FakeTcsV1alpha1
 	ns   string
 }
 

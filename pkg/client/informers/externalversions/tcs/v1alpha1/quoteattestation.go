@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	"context"
-	"time"
+	time "time"
 
 	tcsv1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
 	versioned "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
@@ -62,13 +62,13 @@ func NewFilteredQuoteAttestationInformer(client versioned.Interface, namespace s
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TCSv1alpha1().QuoteAttestations(namespace).List(context.TODO(), options)
+				return client.TcsV1alpha1().QuoteAttestations(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TCSv1alpha1().QuoteAttestations(namespace).Watch(context.TODO(), options)
+				return client.TcsV1alpha1().QuoteAttestations(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&tcsv1alpha1.QuoteAttestation{},

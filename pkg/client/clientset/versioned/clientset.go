@@ -30,19 +30,19 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	TCSv1alpha1() tcsv1alpha1.TCSV1alpha1Interface
+	TcsV1alpha1() tcsv1alpha1.TcsV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	tcsv1alpha1 *tcsv1alpha1.TCSV1alpha1Client
+	tcsV1alpha1 *tcsv1alpha1.TcsV1alpha1Client
 }
 
-// TCSv1alpha1 retrieves the TCSV1alpha1Client
-func (c *Clientset) TCSv1alpha1() tcsv1alpha1.TCSV1alpha1Interface {
-	return c.tcsv1alpha1
+// TcsV1alpha1 retrieves the TcsV1alpha1Client
+func (c *Clientset) TcsV1alpha1() tcsv1alpha1.TcsV1alpha1Interface {
+	return c.tcsV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -89,7 +89,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.tcsv1alpha1, err = tcsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.tcsV1alpha1, err = tcsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.tcsv1alpha1 = tcsv1alpha1.New(c)
+	cs.tcsV1alpha1 = tcsv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

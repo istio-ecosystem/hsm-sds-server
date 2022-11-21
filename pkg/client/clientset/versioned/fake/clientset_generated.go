@@ -79,7 +79,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// TCSv1alpha1 retrieves the TCSV1alpha1Client
-func (c *Clientset) TCSv1alpha1() tcsv1alpha1.TCSV1alpha1Interface {
-	return &faketcsv1alpha1.FakeTCSV1alpha1{Fake: &c.Fake}
+// TcsV1alpha1 retrieves the TcsV1alpha1Client
+func (c *Clientset) TcsV1alpha1() tcsv1alpha1.TcsV1alpha1Interface {
+	return &faketcsv1alpha1.FakeTcsV1alpha1{Fake: &c.Fake}
 }

@@ -35,3 +35,5 @@ endif
 ifndef GOPATH
   $(error Environment Variable GOPATH is not set)
 endif
+
+include make/k8s_codegen.mk

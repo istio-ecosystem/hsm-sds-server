@@ -54,7 +54,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	switch resource {
 	// Group=tcs.intel.com, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("quoteattestations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.TCS().V1alpha1().QuoteAttestations().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Tcs().V1alpha1().QuoteAttestations().Informer()}, nil
 
 	}
 
