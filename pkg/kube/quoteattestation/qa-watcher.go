@@ -42,7 +42,7 @@ type QuoteAttestationWatcher struct {
 	qaLister   qalister.QuoteAttestationLister
 	queue      queue.Queue
 	qaSM       *security.SecretManager
-	tcsClient  v1alpha1.TCSV1alpha1Interface
+	tcsClient  v1alpha1.TcsV1alpha1Interface
 	kubeClient kubernetes.Interface
 }
 
@@ -181,7 +181,7 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 // NewQuoteAttestationWatcher creates a QuoteAttestationWatcher instance 
 func NewQuoteAttestationWatcher(client kube.Client, sm *security.SecretManager) (*QuoteAttestationWatcher, error) {
 	log.Info("New QuoteAttestationWatcher in SDS server")
-	qaInf := client.QaAPIInformer().TCS().V1alpha1().QuoteAttestations().Informer()
+	qaInf := client.QaAPIInformer().Tcs().V1alpha1().QuoteAttestations().Informer()
 	if qaInf == nil {
 		return nil, fmt.Errorf("error: no Quote Attestation Informer can be found by kube/istio client.")
 	}

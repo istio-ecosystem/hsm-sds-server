@@ -41,7 +41,7 @@ type GatewayWatcher struct {
 	queue      queue.Queue
 	gwPodLabel labels.Instance
 	gwSM       *security.SecretManager
-	tcsClient  v1alpha1.TCSV1alpha1Interface
+	tcsClient  v1alpha1.TcsV1alpha1Interface
 }
 
 // Run starts shared informers and waits for the shared informer cache to synchronize
