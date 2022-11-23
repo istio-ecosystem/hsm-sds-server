@@ -78,9 +78,9 @@ type QuoteAttestationSpec struct {
 	// +kubebuilder:optional
 	QuoteVersion string `json:"quoteVersion,omitempty"`
 
-	//// ServiceID holds the unique identifier(name?) that represents service
+	// ServiceID holds the unique identifier(name?) that represents service
 	// which is requesting for the secret.
-	// To be decided wether this should be SPIFFE trust domain!
+	// To be decided whether this should be SPIFFE trust domain!
 	ServiceID string `json:"serviceId"`
 
 	// PublicKey for encrypting the secret, hash is part of the quote data,
@@ -94,7 +94,7 @@ type QuoteAttestationSpec struct {
 
 	// SecretName is name of the Secret object (in the same namespace)
 	// to keep the wrapped on secrets (only needed for KeyProvisioning request type)
-	// which is an opeque type. The secret data must contain two map elements `tls.key`
+	// which is an opaque type. The secret data must contain two map elements `tls.key`
 	// and `tls.cert` and the values are the base64 encoded encrypted CA key and
 	// base64 encoded x509(PEM encoded) certificate. This must be added only after
 	// a successful quote validation and before updating the status condition.
@@ -104,7 +104,7 @@ type QuoteAttestationSpec struct {
 
 // QuoteAttestationCondition describes a condition of a QuoteAttestation object
 type QuoteAttestationCondition struct {
-	// type of the condition. One of QuoteVerified, CASecretReady adn Ready
+	// type of the condition. One of QuoteVerified, CASecretReady and Ready
 	Type ConditionType `json:"type,omitempty"`
 	// Status indicates the status of a condition (true, false, or unknown).
 	Status v1.ConditionStatus `json:"status,omitempty"`
@@ -132,8 +132,8 @@ type QuoteAttestationStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // +k8s:openapi-gen=true
+
 // QuoteAttestation is the Schema for the quoteattestations API
 type QuoteAttestation struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -143,6 +143,8 @@ type QuoteAttestation struct {
 	Status QuoteAttestationStatus `json:"status,omitempty"`
 }
 
+//+kubebuilder:object:root=true
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // QuoteAttestationList contains a list of QuoteAttestation
@@ -150,4 +152,30 @@ type QuoteAttestationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []QuoteAttestation `json:"items"`
+}
+
+func (qas *QuoteAttestationStatus) SetCondition(t ConditionType, status v1.ConditionStatus, reason ConditionReason, message string) {
+	cond := QuoteAttestationCondition{
+		Type:           t,
+		Status:         status,
+		Reason:         reason,
+		Message:        message,
+		LastUpdateTime: metav1.Now(),
+	}
+	for i, c := range qas.Conditions {
+		if c.Type == t {
+			qas.Conditions[i] = cond
+			return
+		}
+	}
+	qas.Conditions = append(qas.Conditions, cond)
+}
+
+func (qas *QuoteAttestationStatus) GetCondition(t ConditionType) *QuoteAttestationCondition {
+	for _, c := range qas.Conditions {
+		if c.Type == t {
+			return &c
+		}
+	}
+	return nil
 }
