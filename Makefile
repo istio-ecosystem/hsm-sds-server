@@ -18,9 +18,17 @@ clean:
 	rm ${OUT}
 # Please make sure that user has enough privilege to execute docker command
 docker: 
-	go build -o ${BINARY} main.go
+	LIBRARY_PATH=/usr/local/lib go build -o ${BINARY} main.go
 	docker build -t ${HUB}/${BINARY}:${TAG} .
 	rm ${BINARY}
+
+ctr: 
+	LIBRARY_PATH=/usr/local/lib go build -o ${BINARY} main.go
+	docker build -t ${HUB}/${BINARY}:${TAG} .
+	rm ${BINARY}
+	docker save -o ${BINARY}.tar ${HUB}/${BINARY}:${TAG}
+	ctr -n k8s.io image import ${BINARY}.tar
+	rm ${BINARY}.tar
 
 docker-client:
 	docker build -f deployment/Dockerfile .

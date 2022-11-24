@@ -3,6 +3,7 @@ package security
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -172,8 +173,8 @@ type CertOptions struct {
 var (
 	TrustDomain = env.RegisterStringVar("TRUST_DOMAIN", "cluster.local",
 		"The trust domain for spiffe certificates").Get()
-	WorkloadNamespace = env.RegisterStringVar("POD_NAMESPACE", "", "").Get()
-	ServiceAccount    = env.RegisterStringVar("SERVICE_ACCOUNT", "", "Name of service account").Get()
+	WorkloadNamespace = env.RegisterStringVar("POD_NAMESPACE", "default", "").Get()
+	ServiceAccount    = env.RegisterStringVar("SERVICE_ACCOUNT", "default", "Name of service account").Get()
 
 	secretRotationGracePeriodRatioEnv = env.Register("SECRET_GRACE_PERIOD_RATIO", 0.5,
 		"The grace period ratio for the cert rotation, by default 0.5.").Get()
@@ -293,12 +294,55 @@ func (sc *SecretManager) CreateNewCertificate(csrPEM []byte, signerCert *x509.Ce
 	if signerCert == nil {
 		signerCert = certTemplate
 	}
-	certPem, err := x509.CreateCertificate(rand.Reader, signerCert, certTemplate, privKey.Public(), privKey)
+	signerKey, err := ParsePemEncodedKey(CAKey)
 	if err != nil {
+		log.Warn(err)
+		return nil, fmt.Errorf("ParsePemEncodedKey failed (%v)", err)
+	}
+	certPem, err := x509.CreateCertificate(rand.Reader, certTemplate, signerCert, privKey.Public(), signerKey)
+
+	if err != nil {
+		log.Warn(err)
 		return nil, fmt.Errorf("Create Certificate failed (%v)", err)
 	}
 	cert, err = encodePem(false, certPem)
 	return cert, err
+}
+
+const (
+	blockTypeECPrivateKey    = "EC PRIVATE KEY"
+	blockTypeRSAPrivateKey   = "RSA PRIVATE KEY" // PKCS#1 private key
+	blockTypePKCS8PrivateKey = "PRIVATE KEY"     // PKCS#8 plain private key
+)
+
+func ParsePemEncodedKey(keyBytes []byte) (crypto.PrivateKey, error) {
+	kb, _ := pem.Decode(keyBytes)
+	if kb == nil {
+		return nil, fmt.Errorf("invalid PEM-encoded key")
+	}
+
+	switch kb.Type {
+	case blockTypeECPrivateKey:
+		key, err := x509.ParseECPrivateKey(kb.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the ECDSA private key")
+		}
+		return key, nil
+	case blockTypeRSAPrivateKey:
+		key, err := x509.ParsePKCS1PrivateKey(kb.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the RSA private key")
+		}
+		return key, nil
+	case blockTypePKCS8PrivateKey:
+		key, err := x509.ParsePKCS8PrivateKey(kb.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the PKCS8 private key")
+		}
+		return key, nil
+	default:
+		return nil, fmt.Errorf("unsupported PEM block type for a private key: %s", kb.Type)
+	}
 }
 
 // getCachedSecret: retrieve cached cert (workload-certificate/workload-root) from secretManager
@@ -395,7 +439,8 @@ func (sc *SecretManager) RegisterSecretHandler(h func(resourceName string)) {
 func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, needQuoteExtension bool) (*x509.CertificateRequest, error) {
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
-			Organization: []string{options.Org},
+			CommonName:   "SGX based workload",
+			Organization: []string{"Intel(R) Corporation"},
 		},
 	}
 
@@ -496,19 +541,20 @@ func ParsePemEncodedCSR(csrBytes []byte) (*x509.CertificateRequest, error) {
 	return csr, nil
 }
 
-// newCACertificate returns a self-signed certificate used as certificate authority
-func newCACertificate(key crypto.Signer) ([]byte, error) {
+// NewCACertificate returns a self-signed certificate used as certificate authority
+func (sc *SecretManager) NewCACertificate() (*x509.Certificate, *rsa.PrivateKey, error) {
 	max := new(big.Int).SetInt64(math.MaxInt64)
 	serial, err := rand.Int(rand.Reader, max)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	tmpl := &x509.Certificate{
 		Version:               tls.VersionTLS12,
 		SerialNumber:          serial,
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour * 24).UTC(),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		IsCA:                  true,
 		BasicConstraintsValid: true,
 		Subject: pkix.Name{
@@ -516,7 +562,20 @@ func newCACertificate(key crypto.Signer) ([]byte, error) {
 			Organization: []string{"Intel(R) Corporation"},
 		},
 	}
-	certBytes, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, err
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, caPrivKey.Public(), caPrivKey)
+	*tmpl = x509.Certificate{}
+	if err != nil {
+		return nil, nil, err
+	}
+	// certPem, _ := encodePem(false, certBytes)
+	cert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return certBytes, nil
+	return cert, caPrivKey, nil
 }

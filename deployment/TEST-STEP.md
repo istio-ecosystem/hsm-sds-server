@@ -23,16 +23,20 @@ curl localhost:15000/config_dump > .json
 
 kubectl exec "$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})" -c istio-proxy -- curl -v -s http://httpbin.default:8000/headers
 
+kubectl exec "$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})" -c sleep -- curl -v -s http://httpbin.default:8000/headers
+
 kubectl exec $(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name}) -c istio-proxy -- curl -s http://httpbin.default:8000/headers -o /dev/null -s -w '%{http_code}\n'
+
+kubectl exec $(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name}) -c sleep -- curl -s http://httpbin.default:8000/headers -o /dev/null -s -w '%{http_code}\n'
 
 # Clean up
 istioctl x uninstall --purge -y
 
 kubectl delete -f deployment/istio-configs/sleep-hsm.yaml
 
-kubectl delete -f deployment/istio-configs/sleep-gateway.yaml
-
 kubectl delete -f deployment/istio-configs/httpbin-hsm.yaml
+
+kubectl delete -f deployment/istio-configs/sleep-gateway.yaml
 
 kubectl get po
 
@@ -41,6 +45,8 @@ kubectl logs -l app=sleep -c testsds
 istioctl pc all sleep-854bcf566d-vd2cp.debugsds -o json > config_dump.json
 
 # Binary test
+LIBRARY_PATH=/usr/local/lib go build main.go
+
 sudo ./main -c /etc/kubernetes/admin.conf
 
 sudo ./envoy -c test/boot.yaml -l debug --service-node 'local-envoy' --service-cluster 'local-envoy'

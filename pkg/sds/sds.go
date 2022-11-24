@@ -115,6 +115,10 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		}
 		sdsSvc.qaWatcher = qaWatcher
 		go sdsSvc.qaWatcher.Run(sdsSvc.stop)
+		// NamespaceName, _ := sdsSvc.sdsClient.Kube().CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{})
+		// SA, _ := sdsSvc.sdsClient.Kube().CoreV1().ServiceAccounts(NamespaceName.Name).Get(context.TODO(), NamespaceName.Name, metav1.GetOptions{})
+		// security.WorkloadNamespace = NamespaceName.Namespace
+		// security.ServiceAccount = SA.Name
 
 		// TODO get cert-signer from proxyconfig
 		// sds server fetch the certificate from Istio configmap by default
@@ -189,7 +193,7 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 			}
 			resp, err := s.buildResponse(lastReq)
 			if err != nil {
-				log.Warnf("Build response failed")
+				log.Warnf("Build response failed: ", err)
 				return
 			}
 			respch <- resp
@@ -412,8 +416,8 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 			s.st.ConfigOptions.SignerCert = signerCert
 		}
 		s.st.SgxctxLock.Lock()
-		cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
-			[]x509.ExtKeyUsage{})
+		cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageKeyEncipherment|x509.KeyUsageKeyAgreement|x509.KeyUsageDigitalSignature,
+			[]x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth})
 		if err != nil {
 			return nil, fmt.Errorf("failed Create New Certificate: %v", err)
 		}

@@ -5,7 +5,7 @@ metadata:
 spec:
   profile: default
   hub: "istio"
-  tag: "sds-1102"
+  tag: "sgx-1122"
   meshConfig:
     defaultConfig:
       proxyMetadata:
@@ -13,23 +13,26 @@ spec:
     caCertificates:
       - pem: |
           -----BEGIN CERTIFICATE-----
-          MIIDFDCCAfygAwIBAgIRAMK/k/OwEAJEa45NOEw5etkwDQYJKoZIhvcNAQELBQAw
-          FzEVMBMGA1UEAxMMaXN0aW8tc3lzdGVtMB4XDTIxMTIxMDA3NDg0MVoXDTIyMDMx
-          MDA3NDg0MVowFzEVMBMGA1UEAxMMaXN0aW8tc3lzdGVtMIIBIjANBgkqhkiG9w0B
-          AQEFAAOCAQ8AMIIBCgKCAQEAzv5KU6gvuWZnRvAtg6IHakT/YL5Cwvm5esemqTh/
-          e4kI8dYOQRuD8B1nZ/eZY4iljbSUpeceV9K2/PQpbSECouDWbCzYH3v/cxUSk7za
-          nLfrHRBXyA25dIIWDr/yKkmwWBJQHwWQAmKDANOlJic30Ki5AzAUIHQpFodErLSD
-          L0M1dUVHhWB2erIGKZRzvB1AuzsQLORZY4I/W8zpLFs96L4ecjfBqTTNzcFoa4qK
-          lrkkx0iduL1YloeLgIzHy6spzVRCVpdQ0RctPfcspR+YW0Nfgsy5GR6+adWYQp3V
-          pBsloooSLG//30X7mmHi5yoAAmzNl9qiSzqB3M8fAVmPxQIDAQABo1swWTAOBgNV
-          HQ8BAf8EBAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUkXJ5NmCrDEl9
-          O1L7jjXa7Ide5gUwFwYDVR0RBBAwDoIMaXN0aW8tc3lzdGVtMA0GCSqGSIb3DQEB
-          CwUAA4IBAQB0/FMAg/Bf1mEaBbN14jLUHtHjnyeSd2fnLby1Yg79CIdQ0ffaWGJA
-          6LA4G2DXYxScOBcoxokujx7mCHlHwHg6UxOsiTH7DlqjhIAn2dRt1A1WH9vOvQ5r
-          j5TbvJeF9xgofRotIMeqTLtM3Ozcho2Yv5pqWyWJJkjTdkHuop0Q5jl8lDhF4rh1
-          DAJwkDiUs0TtePeVeTaG6+28XOSz/WFqk7vCUJrRXU+nBH9nmRURLdfFJpirviZv
-          LVDhhkjYP9dYARfl6lPN0CjuwvwkTsjCR3QUaJkHqG1qUb2RNGh6L4dIbvX8QKH1
-          sZFKWfif1FC6pr1GLToH4L2s4zrD/u4Q
+          MIIDjTCCAnWgAwIBAgIUflG9UK6yXg9qY/jbLVMKr95ZDWwwDQYJKoZIhvcNAQEL
+          BQAwVjELMAkGA1UEBhMCR0IxDzANBgNVBAcMBkxvbmRvbjEWMBQGA1UECgwNY2x1
+          c3Rlci5sb2NhbDEeMBwGA1UEAwwVd3d3LmNsdXN0ZXIubG9jYWwuY29tMB4XDTIy
+          MTEyMzA2MDEwNloXDTIzMTEyMzA2MDEwNlowVjELMAkGA1UEBhMCR0IxDzANBgNV
+          BAcMBkxvbmRvbjEWMBQGA1UECgwNY2x1c3Rlci5sb2NhbDEeMBwGA1UEAwwVd3d3
+          LmNsdXN0ZXIubG9jYWwuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+          AQEA0LTkl5e51NjHO6FyU3CrYN5tYsSoXbzFu6jnFxixoqZ+ub/hWR0tJx8CjlLG
+          q12gL0qmQA2INLpV4CjQaCNYl6Je8kXTfBGddNCHyVRER+Ygjlec1hB2sAsJOv9d
+          mi4m0fUtcqGppyUHx8ZUsmydrkMSQitqE1S8IRw41eVs2BHYmLm8t9LIvgBZX+T5
+          hKPbg9rJN90cN3k3wvw7sUpn2QXkyuCcRPr75J1vfliStZN2UDwlFt+UjUd8npic
+          NiKpm7k45hHsAwTusveV8ponOKcCLpnCcg+AU/p3ZCF9AcT53RM4pkquNkMr2ckb
+          lkEPGgk1Cyy4w8osiiJaTuw5zwIDAQABo1MwUTAdBgNVHQ4EFgQUDsTPVhGa6Icg
+          zXgsTsIILK7GpvIwHwYDVR0jBBgwFoAUDsTPVhGa6IcgzXgsTsIILK7GpvIwDwYD
+          VR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAE0dMKnDJOqphEx3uxLlX
+          2T4SOoiqzy2SFFMXCYp29e0EJT+rvzpZbyfMs+BSh8519Llt5nU430NK4Ldt2OA0
+          GzP8cBlZvuMMlQ7ILjcj3VfP/quTxHQbdvey1xOhQCgdqbM+2cEoVNXdBE5xf+m8
+          IqEcSuU8jLxgc8gwGOPyMogujgLu5hXH55zTHovd2Zh1c68bIY5j4Q91Pu0WuSHT
+          aqueCcnfKnSALwwJbqVMg0Ib3qzUl2rmsHoUqxaJt+rC/nzOE9Pdb1nHPpqrN0iU
+          bNikPzSBIpVCDL3B6cjbsYjcWm9sSQMapBIqDDbyjitz8tLHfCqG1WBPxHHgV9ix
+          iQ==
           -----END CERTIFICATE-----
         certSigners:
         - clusterissuers.cert-manager.io/istio-system
