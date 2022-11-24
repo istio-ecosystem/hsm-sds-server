@@ -82,6 +82,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		TTL:        time.Hour * 24,
 		NotBefore:  time.Now(),
 		RSAKeySize: security.DefaultRSAKeysize,
+		Org:        "Intel(R) Corporation",
 	}
 	st, err := util.NewSecretManager(&options)
 	if st != nil && err == nil {

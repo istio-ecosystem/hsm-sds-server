@@ -440,7 +440,7 @@ func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, needQ
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   "SGX based workload",
-			Organization: []string{"Intel(R) Corporation"},
+			Organization: []string{options.Org},
 		},
 	}
 
