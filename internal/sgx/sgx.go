@@ -526,6 +526,8 @@ func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
 	ctx.quotePubKey = pub
 	ctx.quotePrvKey = priv
 
+	log.Info("Wraped public key: ", pub)
+
 	quote, err := generateQuote(ctx.p11Ctx, ctx.p11Session, pub)
 	if err != nil {
 		ctx.p11Ctx.Destroy()
@@ -601,11 +603,12 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 
 	rsaPkcsOaepMech := pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, pkcs11.NewOAEPParams(pkcs11.CKM_SHA_1, pkcs11.CKG_MGF1_SHA1, pkcs11.CKZ_DATA_SPECIFIED, nil))
 	swkHandle, err := pCtx.UnwrapKey(ctx.p11Session, []*pkcs11.Mechanism{rsaPkcsOaepMech}, ctx.quotePrvKey, wrappedSWK, attributeSWK)
+	log.Info("provisionKey swkHandle: ", swkHandle)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap symmetric wrapping key: %v", err)
 	}
 
-	ctx.log.Info("Unwrapped SWK Key successfully")
+	log.Info("Unwrapped SWK Key successfully")
 
 	keyID, err := generateKeyID(rand.Reader, 16)
 	attributeWPK := []*pkcs11.Attribute{
@@ -626,7 +629,7 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 	if err != nil {
 		return fmt.Errorf("failed to unwrap private key: %v", err)
 	}
-	ctx.log.Info("Unwrapped PWK Key successfully")
+	log.Info("Unwrapped PWK Key successfully")
 
 	template := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, nil),
@@ -635,7 +638,7 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 	}
 	publicKeyAttrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, prvKey, template)
 	if err != nil {
-		ctx.log.Info("Failed to fetch public attributes: %v", err)
+		log.Info("Failed to fetch public attributes: %v", err)
 	}
 	publicKeyAttrs = append(publicKeyAttrs, []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
@@ -644,9 +647,9 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
 	}...)
 	if _, err := ctx.p11Ctx.CreateObject(ctx.p11Session, publicKeyAttrs); err != nil {
-		ctx.log.Info("Failed to add public key object", "error", err)
+		log.Info("Failed to add public key object", "error", err)
 	}
-	ctx.log.Info("Unwrapped Public Key successfully")
+	log.Info("Unwrapped Public Key successfully")
 
 	return nil
 }

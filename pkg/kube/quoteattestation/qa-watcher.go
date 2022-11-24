@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,12 +15,9 @@ import (
 	quoteapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
 	v1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha1"
 	qalister "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/listers/tcs/v1alpha1"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/constants"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/util/cmutil"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/util/k8sutil"
 
 	"istio.io/pkg/log"
 )
@@ -60,27 +56,47 @@ func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
 
 // onQuoteAttestationAdd is the add event for Istio Quote Attestation
 func (qa *QuoteAttestationWatcher) onQuoteAttestationAdd(obj any) {
+	log.Info("Call onQuoteAttestationAdd")
 	qaCR := obj.(*quoteapi.QuoteAttestation)
 	qa.queue.Add(types.NamespacedName{Namespace: qaCR.Namespace, Name: qaCR.Name})
 
 	return
 }
 
+// onQuoteAttestationUpdate is the update event for Istio Quote Attestation
+func (qa *QuoteAttestationWatcher) onQuoteAttestationUpdate(obj any) {
+	log.Info("Call onQuoteAttestationUpdate")
+	qaCR := obj.(*quoteapi.QuoteAttestation)
+	qa.queue.Add(types.NamespacedName{Namespace: qaCR.Namespace, Name: qaCR.Name})
+	return
+}
+
 func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 	log.Info("Start to run QuoteAttestationWatcher Reconcile")
-	log := log.WithLabels("istio Quote Attestation", req)
+	log.Info("Namespace: ", req.Namespace, " Name: ", req.Name)
 	qaObj, err := qa.qaLister.QuoteAttestations(req.Namespace).Get(req.Name)
 	if err != nil {
 		log.Errorf("Reconcile: unable to fetch Quote Attestation CR %s under the namespace %s : %v", req.Name, req.Namespace, err)
 		return err
 	}
-	return nil
 	var statusErr error
+	log.Info("need to check: ", qaObj.ObjectMeta.DeletionTimestamp.IsZero())
 	if qaObj.ObjectMeta.DeletionTimestamp.IsZero() {
 		log.Info("checking quoteattestation status")
-		var attesReady bool
-		var cMessage string
+		log.Info("QA Status: ", qaObj.Status)
+		log.Info("QA SecretName: ", qaObj.Spec.SecretName)
+		// var attesReady bool
+		// var cMessage string
+		if qaObj.Spec.SecretName == "" {
+			return nil
+		}
+
+		/*if len(qaObj.Status.Conditions) == 0 {
+			log.Info("QA Conditions lenght is: ", 0)
+			return nil
+		}
 		for _, c := range qaObj.Status.Conditions {
+			log.Info("QuoteAttestationWatcher Reconcile QA status: ", c.Type)
 			if c.Type == quoteapi.ConditionReady {
 				attesReady = true
 				break
@@ -92,21 +108,19 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 			message := "quote attestation verification failure"
 			log.Error(fmt.Errorf(message), "message", cMessage)
 			return fmt.Errorf(message)
-		}
+		}*/
 		// attestation passed. Quote get verified
 		log.Info("quoteattestation verification success")
 		signer := qaObj.Spec.SignerName
 		secretName := qaObj.Spec.SecretName
-		var caSecretName string
 
 		log.Info("using KMRA based secret.")
-		if caSecretName, err = qa.loadKMRASecret(qa.kubeClient, secretName, signer, req.Namespace); err != nil {
+		if err = qa.loadKMRASecret(qa.kubeClient, secretName, signer, req.Namespace); err != nil {
 			log.Error(err, "failed to load private key for signer ", signer)
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
 
-		log.Info("Need to fetch the secret [%s]", caSecretName)
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
 		statusErr = multierror.Append(statusErr, err)
@@ -118,64 +132,25 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 	return nil
 }
 
-func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interface, secretName, signerName string, ns string) (string, error) {
+func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interface, secretName, signerName string, ns string) error {
 	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return err
 	}
 	wrappedData := secret.Data[corev1.TLSPrivateKeyKey]
-	cmCert := secret.Data[corev1.TLSCertKey]
-
 	sgxctx := qa.qaSM.SgxContext
 	//try to clean up old key
 	err = sgxctx.RemoveKeyForSigner(signerName)
 	if err != nil {
-		return "", err
+		return err
 	}
 	err = sgxctx.ProvisionKey(signerName, wrappedData)
 	if err != nil {
 		// log.Error(err, "Failed to provision key to enclave")
-		return "", err
+		return err
 	}
 
-	ref, _ := k8sutil.SignerIssuerRefFromSignerName(signerName)
-	if t, _ := k8sutil.IssuerKindFromType(ref.Type); t == constants.ClusterIssuerKind {
-		ns = ""
-	}
-
-	cmSecretName := cmutil.GenerateSecretName(signerName)
-	cmSecretExist := false
-	cmSecret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), cmSecretName, metav1.GetOptions{})
-	if err == nil {
-		cmSecretExist = true
-	} else if k8sErrors.IsNotFound(err) {
-		cmSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cmSecretName,
-				Namespace: ns,
-			},
-			Type: corev1.SecretTypeTLS,
-		}
-	} else {
-		return "", err
-	}
-
-	if cmSecret.Data == nil {
-		cmSecret.Data = make(map[string][]byte)
-	}
-	cmSecret.Data[corev1.TLSPrivateKeyKey] = []byte(signerName)
-	cmSecret.Data[corev1.TLSCertKey] = cmCert
-
-	if cmSecretExist {
-		_, err = kubeClient.CoreV1().Secrets(ns).Update(context.Background(), cmSecret, metav1.UpdateOptions{})
-	} else {
-		_, err = kubeClient.CoreV1().Secrets(ns).Create(context.Background(), cmSecret, metav1.CreateOptions{})
-	}
-	if err != nil {
-		return "", err
-	}
-
-	return cmSecretName, nil
+	return nil
 }
 
 // NewQuoteAttestationWatcher creates a QuoteAttestationWatcher instance 
@@ -207,6 +182,7 @@ func NewQuoteAttestationWatcher(client kube.Client, sm *security.SecretManager) 
 	qa.qaInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj any) { qa.onQuoteAttestationAdd(obj) },
+			UpdateFunc: func(oldObj any, newObj any) { qa.onQuoteAttestationUpdate(newObj) },
 		},
 	)
 	return qa, nil

@@ -229,6 +229,7 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 	}
 
 	options.Host = csrHostName.String()
+	needQuoteExtension = false
 	if needQuoteExtension {
 		if err = sc.SgxContext.GenerateQuoteAndPublicKey(); err != nil {
 			return nil, fmt.Errorf("failed to generate sgx quote and public key %s", err)

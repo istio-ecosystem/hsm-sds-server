@@ -67,6 +67,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 		log.Errorf("error: istio gateway %s has not selector.", gatewayCR.Name)
 		return
 	}
+	var credNames []string
 	// fetch the credential name for gateway CR
 	gatewaySelector := labels.Instance(gwSeletor)
 	log.Infof("This sds server gatewaySelector: %v", gatewaySelector)
@@ -79,6 +80,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 				credName := gwTLS.GetCredentialName()
 				if credName != "" {
 					log.Infof("Credential Name of the gatway is [%s]", credName)
+					credNames = append(credNames, credName)
 					gw.gwSM.SetCredNameMap(gwServer.Port, credName)
 				} else {
 					log.Errorf("error: no required gateway %s CredentialName for the sds server", gatewayCR.Name)
@@ -88,19 +90,19 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 		}
 	}
 
-	// create quoteAttestation CR for gateway CR
-	ctx := context.Background()
-	instanceName := quoteAttestationPrefix + gatewayCR.Name
-	// TODO: pendingSelfSignerName should be fetched from some other places
-	pendingSelfSignerName := security.PendingSelfSignerName
-	if pendingSelfSignerName != "" {
-		if err := gw.QuoteAttestationDeliver(ctx, pendingSelfSignerName, instanceName, gatewayCR.Namespace); err != nil {
-			log.Errorf("failed to created or updated quoteAttestation CR %s", err)
-			return
+	for _, credName := range credNames {
+		// create quoteAttestation CR for gateway CR
+		ctx := context.Background()
+		instanceName := quoteAttestationPrefix + gatewayCR.Name
+		if credName != "" {
+			if err := gw.QuoteAttestationDeliver(ctx, credName, instanceName, gatewayCR.Namespace); err != nil {
+				log.Errorf("failed to created or updated quoteAttestation CR %s", err)
+				return
+			}
+			log.Info("QuoteAttestation CR created or updated ", "name", instanceName)
+		} else {
+			gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		}
-		log.Info("QuoteAttestation CR created or updated", "name", instanceName)
-	} else {
-		gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 	}
 	return
 }
