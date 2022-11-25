@@ -230,17 +230,16 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 	}
 
 	options.Host = csrHostName.String()
-	needQuoteExtension = false
 	if needQuoteExtension {
-		if err = sc.SgxContext.GenerateQuoteAndPublicKey(); err != nil {
+		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false); err != nil {
 			return nil, fmt.Errorf("failed to generate sgx quote and public key %s", err)
 		}
-		quote, err := sc.SgxContext.Quote()
+		quote, err := sc.SgxContext.Quote(false)
 		if err != nil {
 			return nil, fmt.Errorf("get sgx quote error %s", err)
 		}
 
-		quotePubKey, err := sc.SgxContext.QuotePublicKey()
+		quotePubKey, err := sc.SgxContext.QuotePublicKey(false)
 		if err != nil {
 			return nil, fmt.Errorf("get quote public key error %s", err)
 		}

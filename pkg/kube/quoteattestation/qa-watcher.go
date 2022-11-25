@@ -144,7 +144,7 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	if err != nil {
 		return err
 	}
-	err = sgxctx.ProvisionKey(signerName, wrappedData)
+	err = sgxctx.ProvisionKey(signerName, wrappedData, true)
 	if err != nil {
 		// log.Error(err, "Failed to provision key to enclave")
 		return err

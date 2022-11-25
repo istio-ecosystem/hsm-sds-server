@@ -183,15 +183,15 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 		return fmt.Errorf("sgx context for this hsm custom resource has not been initialized")
 	}
 
-	if err := sgxctx.GenerateQuoteAndPublicKey(); err != nil {
+	if err := sgxctx.GenerateQuoteAndPublicKey(true); err != nil {
 		return fmt.Errorf("failed to generate sgx quote and public key %s", err)
 	}
-	quote, err := sgxctx.Quote()
+	quote, err := sgxctx.Quote(true)
 	if err != nil {
 		return fmt.Errorf("get sgx quote error %s", err)
 	}
 
-	publicKey, err := sgxctx.QuotePublicKey()
+	publicKey, err := sgxctx.QuotePublicKey(true)
 	if err != nil {
 		return fmt.Errorf("get public key error %s", err)
 	}

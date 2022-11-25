@@ -127,6 +127,12 @@ type SgxContext struct {
 	quotePubKey pkcs11.ObjectHandle
 	// generated quote
 	ctkQuote []byte
+	// private key used for gateway quote generation
+	gwQuotePrvKey pkcs11.ObjectHandle
+	// private key used for gateway quote generation
+	gwQuotePubKey pkcs11.ObjectHandle
+	// generated quote for gateway
+	gwCTKQuote []byte
 
 	cryptoCtx     *crypto11.Context
 	cryptoCtxLock sync.Mutex
@@ -210,25 +216,37 @@ func (ctx *SgxContext) Destroy() {
 	ctx.destroyCryptoContext()
 }
 
-func (ctx *SgxContext) Quote() ([]byte, error) {
-	if ctx.ctkQuote == nil {
+func (ctx *SgxContext) Quote(isGW bool) ([]byte, error) {
+	var quote []byte
+	if isGW {
+		quote = ctx.gwCTKQuote
+	} else {
+		quote = ctx.ctkQuote
+	}
+	if quote == nil  {
 		return nil, fmt.Errorf("empty quote")
 	}
-	strQuote := base64.StdEncoding.EncodeToString(ctx.ctkQuote)
+	strQuote := base64.StdEncoding.EncodeToString(quote)
 	return []byte(strQuote), nil
 }
 
 // QuotePublicKey returns the base64 encoded key
 // used for quote generation
-func (ctx *SgxContext) QuotePublicKey() ([]byte, error) {
+func (ctx *SgxContext) QuotePublicKey(isGW bool) ([]byte, error) {
 	// ctx.p11CtxLock.Lock()
 	// defer ctx.p11CtxLock.Unlock()
 
+	var quotePubKey pkcs11.ObjectHandle
+	if isGW {
+		quotePubKey = ctx.gwQuotePubKey
+	} else {
+		quotePubKey = ctx.quotePubKey
+	}
 	template := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
 		pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),
 	}
-	attrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, ctx.quotePubKey, template)
+	attrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, quotePubKey, template)
 	if err != nil {
 		return nil, err
 	}
@@ -276,6 +294,8 @@ func (ctx *SgxContext) destroyP11Context() {
 		ctx.p11Ctx.Logout(ctx.p11Session)
 		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.quotePrvKey)
 		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.quotePubKey)
+		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.gwQuotePrvKey)
+		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.gwQuotePubKey)
 		ctx.p11Ctx.CloseSession(ctx.p11Session)
 		ctx.p11Ctx.Destroy()
 		ctx.p11Ctx = nil
@@ -513,8 +533,14 @@ func (ctx *SgxContext) RemoveKey(keyLabel string) error {
 	return nil
 }
 
-func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
-	if ctx.ctkQuote != nil {
+func (ctx *SgxContext) GenerateQuoteAndPublicKey(isGW bool) error {
+	var ctkQuote []byte
+	if isGW {
+		ctkQuote = ctx.gwCTKQuote
+	} else {
+		ctkQuote = ctx.ctkQuote
+	}
+	if ctkQuote != nil {
 		log.Infof("SGX Quote already generated")
 		return nil
 	}
@@ -523,17 +549,23 @@ func (ctx *SgxContext) GenerateQuoteAndPublicKey() error {
 		ctx.Destroy()
 		return fmt.Errorf("call to generateP11KeyPair failed %s", err)
 	}
-	ctx.quotePubKey = pub
-	ctx.quotePrvKey = priv
-
-	log.Info("Wraped public key: ", pub)
 
 	quote, err := generateQuote(ctx.p11Ctx, ctx.p11Session, pub)
 	if err != nil {
 		ctx.p11Ctx.Destroy()
 		return fmt.Errorf("call to generateQuote failed %s", err)
 	}
-	ctx.ctkQuote = quote
+
+	if isGW {
+		ctx.gwQuotePubKey = pub
+		ctx.gwQuotePrvKey = priv
+		ctx.gwCTKQuote = quote
+	} else {
+		ctx.quotePubKey = pub
+		ctx.quotePrvKey = priv
+		ctx.ctkQuote = quote
+	}
+
 	return nil
 }
 
@@ -572,7 +604,7 @@ func (ctx *SgxContext) GetSignerForName(name string) (crypto11.Signer, error) {
 
 // This method should be called on reply getting from key-manager
 // after successful quote validation.
-func (ctx *SgxContext) ProvisionKey(signerName string, base64Data []byte) error {
+func (ctx *SgxContext) ProvisionKey(signerName string, base64Data []byte, isGW bool) error {
 	decodedData, err := base64.StdEncoding.DecodeString(string(base64Data))
 	if err != nil {
 		return fmt.Errorf("corrupted key data: %v", err)
@@ -585,13 +617,19 @@ func (ctx *SgxContext) ProvisionKey(signerName string, base64Data []byte) error 
 	wrappedSwk := decodedData[:DefaultRSAKeySize/8]
 	wrappedPrKey := decodedData[DefaultRSAKeySize/8:]
 
-	return ctx.provisionKey(signerName, wrappedSwk, wrappedPrKey)
+	return ctx.provisionKey(signerName, wrappedSwk, wrappedPrKey, isGW)
 }
 
-func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedKey []byte) error {
+func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedKey []byte, isGW bool) error {
 	ctx.cryptoCtxLock.Lock()
 	defer ctx.cryptoCtxLock.Unlock()
 
+	var quotePrvKey pkcs11.ObjectHandle
+	if isGW {
+		quotePrvKey = ctx.gwQuotePrvKey
+	} else {
+		quotePrvKey = ctx.quotePrvKey
+	}
 	pCtx := ctx.p11Ctx
 	attributeSWK := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_SECRET_KEY),
@@ -602,7 +640,7 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 	}
 
 	rsaPkcsOaepMech := pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, pkcs11.NewOAEPParams(pkcs11.CKM_SHA_1, pkcs11.CKG_MGF1_SHA1, pkcs11.CKZ_DATA_SPECIFIED, nil))
-	swkHandle, err := pCtx.UnwrapKey(ctx.p11Session, []*pkcs11.Mechanism{rsaPkcsOaepMech}, ctx.quotePrvKey, wrappedSWK, attributeSWK)
+	swkHandle, err := pCtx.UnwrapKey(ctx.p11Session, []*pkcs11.Mechanism{rsaPkcsOaepMech}, quotePrvKey, wrappedSWK, attributeSWK)
 	log.Info("provisionKey swkHandle: ", swkHandle)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap symmetric wrapping key: %v", err)
