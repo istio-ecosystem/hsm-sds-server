@@ -21,6 +21,7 @@ FROM ubuntu:20.04 as builder
 ARG SDK_VERSION="2.17.100.3"
 ARG SGX_SDK_INSTALLER=sgx_linux_x64_sdk_${SDK_VERSION}.bin
 ENV DEBIAN_FRONTEND=noninteractive
+ARG DCAP_VERSION="1.14.100.3"
 # SGX prerequisites
 # hadolint ignore=DL3005,DL3008
 RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
@@ -59,13 +60,13 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
     libsgx-ae-epid=${SDK_VERSION}-focal1 \
     libsgx-ae-le=${SDK_VERSION}-focal1 \
     libsgx-ae-pce=${SDK_VERSION}-focal1 \
-    libsgx-ae-qe3 \
-    libsgx-ae-qve \
-    libsgx-dcap-ql \
-    libsgx-dcap-ql-dev \
-    libsgx-pce-logic \
-    libsgx-qe3-logic \
-    libsgx-dcap-default-qpl \
+    libsgx-ae-qe3=${DCAP_VERSION}-focal1 \
+    libsgx-ae-qve=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-ql=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-ql-dev=${DCAP_VERSION}-focal1 \
+    libsgx-pce-logic=${DCAP_VERSION}-focal1 \
+    libsgx-qe3-logic=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-default-qpl=${DCAP_VERSION}-focal1 \
   && apt-get clean \
   && ln -s /usr/lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 /usr/lib/x86_64-linux-gnu/libsgx_enclave_common.so
 
@@ -124,7 +125,7 @@ RUN mkdir -p /usr/local/share/package-licenses \
 FROM ubuntu:focal as runtime
 
 ARG SDK_VERSION="2.17.100.3"
-# ARG DCAP_VERSION="1.12.100.3"
+ARG DCAP_VERSION="1.14.100.3"
 
 RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
   && export HTTPS_PROXY=http://child-prc.intel.com:913 \
@@ -144,11 +145,11 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
     libsgx-quote-ex=${SDK_VERSION}-focal1 \
     libsgx-urts=${SDK_VERSION}-focal1 \
     libsgx-ae-epid=${SDK_VERSION}-focal1 \
-    libsgx-ae-qe3 \
-    libsgx-dcap-ql \
-    libsgx-pce-logic \
-    libsgx-qe3-logic \
-    libsgx-dcap-default-qpl \
+    libsgx-ae-qe3=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-ql=${DCAP_VERSION}-focal1 \
+    libsgx-pce-logic=${DCAP_VERSION}-focal1 \
+    libsgx-qe3-logic=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-default-qpl=${DCAP_VERSION}-focal1 \
     libsofthsm2 \
     # required for pkcs11-tool
     opensc | tee --append /usr/local/share/package-install.log' \
@@ -223,11 +224,6 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
 
 USER $USERNAME  
 ADD prepare.sh /home/istio-proxy/prepare.sh
-# ADD envoy-sgx /home/istio-proxy/envoy
-# ADD envoy-mtls-integreation.yaml /home/istio-proxy/envoy-mtls-integreation.yaml
-# ADD mtls-server.crt /home/istio-proxy/mtls-server.crt
-# ADD mtls-client.crt /home/istio-proxy/mtls-client.crt
-# ADD test/boot.yaml /home/istio-proxy/boot.yaml
 # RUN /bin/sh prepare.sh
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV SGX_LIBRARY_PATH="/home/istio-proxy/sgx/lib"

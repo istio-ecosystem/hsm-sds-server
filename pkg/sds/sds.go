@@ -78,11 +78,12 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 	log.Info("starting sds service")
 	var sdsSvc *sdsservice
 	options := security.CertOptions{
-		IsCA:       false,
-		TTL:        time.Hour * 24,
-		NotBefore:  time.Now(),
-		RSAKeySize: security.DefaultRSAKeysize,
-		Org:        "Intel(R) Corporation",
+		IsCA:                           false,
+		TTL:                            time.Hour * 24,
+		NotBefore:                      time.Now(),
+		RSAKeySize:                     security.DefaultRSAKeysize,
+		Org:                            "Intel(R) Corporation",
+		SecretRotationGracePeriodRatio: 0.5,
 	}
 	st, err := util.NewSecretManager(&options)
 	if st != nil && err == nil {
