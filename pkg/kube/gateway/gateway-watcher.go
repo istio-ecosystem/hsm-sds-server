@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,7 @@ const (
 	KMRABased              = "KMRA"
 	asRootCA               = true
 	defaultCertPrefix      = "init-cert."
+	sdsCredNamePrefix      = "sds://"
 )
 
 type GatewayWatcher struct {
@@ -59,8 +61,6 @@ func (gw *GatewayWatcher) Run(stopCh chan struct{}) {
 // onGatewayAdd is the add event for Istio gateway
 func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	gatewayCR := obj.(*gateway.Gateway)
-	gw.queue.Add(types.NamespacedName{Namespace: gatewayCR.Namespace, Name: gatewayCR.Name})
-
 	gwAPICR := istioapi.Gateway(gatewayCR.Spec)
 	gwSeletor := gwAPICR.GetSelector()
 	if gwSeletor == nil {
@@ -78,7 +78,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 		for _, gwServer := range gwServers {
 			if gwTLS := gwServer.GetTls(); gwTLS != nil {
 				credName := gwTLS.GetCredentialName()
-				if credName != "" {
+				if credName != "" && strings.HasPrefix(credName, sdsCredNamePrefix) {
 					log.Infof("Credential Name of the gatway is [%s]", credName)
 					credNames = append(credNames, credName)
 					gw.gwSM.SetCredNameMap(gwServer.Port, credName)
@@ -88,6 +88,10 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 				}
 			}
 		}
+	}
+
+	if len(credNames) == 0 {
+		return
 	}
 
 	for _, credName := range credNames {
@@ -104,6 +108,8 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 			gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		}
 	}
+	gw.queue.Add(types.NamespacedName{Namespace: gatewayCR.Namespace, Name: gatewayCR.Name})
+
 	return
 }
 

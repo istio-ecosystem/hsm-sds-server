@@ -56,6 +56,10 @@ func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
 
 // onQuoteAttestationAdd is the add event for Istio Quote Attestation
 func (qa *QuoteAttestationWatcher) onQuoteAttestationAdd(obj any) {
+	credNameMap := qa.qaSM.GetCredNameMap()
+	if len(credNameMap) == 0 {
+		return
+	}
 	log.Info("Call onQuoteAttestationAdd")
 	qaCR := obj.(*quoteapi.QuoteAttestation)
 	qa.queue.Add(types.NamespacedName{Namespace: qaCR.Namespace, Name: qaCR.Name})
@@ -65,6 +69,10 @@ func (qa *QuoteAttestationWatcher) onQuoteAttestationAdd(obj any) {
 
 // onQuoteAttestationUpdate is the update event for Istio Quote Attestation
 func (qa *QuoteAttestationWatcher) onQuoteAttestationUpdate(obj any) {
+	credNameMap := qa.qaSM.GetCredNameMap()
+	if len(credNameMap) == 0 {
+		return
+	}
 	log.Info("Call onQuoteAttestationUpdate")
 	qaCR := obj.(*quoteapi.QuoteAttestation)
 	qa.queue.Add(types.NamespacedName{Namespace: qaCR.Namespace, Name: qaCR.Name})
