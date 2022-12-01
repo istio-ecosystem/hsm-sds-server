@@ -28,7 +28,7 @@ const (
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
-	PendingSelfSignerName      = "clusterissuers.cert-manager.io/istio-system"
+	PendingSelfSignerName      = "clusterissuers.tcs.intel.com/istio-system"
 	// Max retry time to get signed certificate in kubernetes csr
 	MAXRetryTime = 5
 	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
@@ -229,6 +229,7 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 		ServiceAccount: ServiceAccount,
 	}
 
+	log.Info("DEBUG SPIFFE ID: ", csrHostName)
 	options.Host = csrHostName.String()
 	if needQuoteExtension {
 		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false); err != nil {

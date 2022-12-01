@@ -117,9 +117,6 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		}
 		sdsSvc.qaWatcher = qaWatcher
 		go sdsSvc.qaWatcher.Run(sdsSvc.stop)
-		// NamespaceName, _ := sdsSvc.sdsClient.Kube().CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{})
-		// SA, _ := sdsSvc.sdsClient.Kube().CoreV1().ServiceAccounts(NamespaceName.Name).Get(context.TODO(), NamespaceName.Name, metav1.GetOptions{})
-		// security.WorkloadNamespace = NamespaceName.Namespace
 		// security.ServiceAccount = SA.Name
 
 		// TODO get cert-signer from proxyconfig

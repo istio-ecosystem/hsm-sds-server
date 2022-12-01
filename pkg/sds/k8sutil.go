@@ -10,6 +10,9 @@ import (
 )
 
 func (s *sdsservice) CreateK8sCSR(csr []byte, resourceName string) (*certv1.CertificateSigningRequest, error) {
+	s.st.SgxctxLock.Lock()
+	defer s.st.SgxctxLock.Unlock()
+
 	var k8scsr *certv1.CertificateSigningRequest
 	k8scsr, err := s.sdsClient.Kube().CertificatesV1().CertificateSigningRequests().Get(context.TODO(), resourceName, metav1.GetOptions{})
 
