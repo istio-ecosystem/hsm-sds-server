@@ -13,7 +13,7 @@ metadata:
   name: sleep
 rules:
 - apiGroups: [""]
-  resources: ["configmaps", "secrets", "namespaces", "serviceaccounts"]
+  resources: ["configmaps", "secrets"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["networking.istio.io"]
   resources: ["gateways"]
@@ -22,8 +22,8 @@ rules:
   resources: ["quoteattestations"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["certificates.k8s.io"]
-  resources: ["certificatesigningrequests", "certificatesigningrequests/approve"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "approve"]
+  resources: ["certificatesigningrequests", "certificatesigningrequests/approval"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "approval"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

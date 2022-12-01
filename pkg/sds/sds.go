@@ -117,7 +117,6 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		}
 		sdsSvc.qaWatcher = qaWatcher
 		go sdsSvc.qaWatcher.Run(sdsSvc.stop)
-		// security.ServiceAccount = SA.Name
 
 		// TODO get cert-signer from proxyconfig
 		// sds server fetch the certificate from Istio configmap by default
