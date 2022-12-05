@@ -33,7 +33,7 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 
 	// init the SecretCache
 	st.Cache = security.SecretCache{}
-	st.GetCredNameMap()
+	st.GetCredMap()
 
 	var err error
 	if err = st.SgxConfigs.Validate(); err != nil {

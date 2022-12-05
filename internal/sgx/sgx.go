@@ -242,6 +242,8 @@ func (ctx *SgxContext) QuotePublicKey(isGW bool) ([]byte, error) {
 	} else {
 		quotePubKey = ctx.quotePubKey
 	}
+	log.Info("Workload quote public key: ", ctx.quotePubKey)
+	log.Info("Gateway quote public key: ", ctx.gwQuotePubKey)
 	template := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
 		pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),

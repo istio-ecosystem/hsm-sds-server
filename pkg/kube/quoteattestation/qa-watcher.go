@@ -1,6 +1,7 @@
 package quoteattestation
 
 import (
+	"encoding/base64"
 	"context"
 	"fmt"
 
@@ -56,8 +57,8 @@ func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
 
 // onQuoteAttestationAdd is the add event for Istio Quote Attestation
 func (qa *QuoteAttestationWatcher) onQuoteAttestationAdd(obj any) {
-	credNameMap := qa.qaSM.GetCredNameMap()
-	if len(credNameMap) == 0 {
+	credMap := qa.qaSM.GetCredMap()
+	if len(credMap) == 0 {
 		return
 	}
 	log.Info("Call onQuoteAttestationAdd")
@@ -69,8 +70,8 @@ func (qa *QuoteAttestationWatcher) onQuoteAttestationAdd(obj any) {
 
 // onQuoteAttestationUpdate is the update event for Istio Quote Attestation
 func (qa *QuoteAttestationWatcher) onQuoteAttestationUpdate(obj any) {
-	credNameMap := qa.qaSM.GetCredNameMap()
-	if len(credNameMap) == 0 {
+	credMap := qa.qaSM.GetCredMap()
+	if len(credMap) == 0 {
 		return
 	}
 	log.Info("Call onQuoteAttestationUpdate")
@@ -128,7 +129,6 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
-
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
 		statusErr = multierror.Append(statusErr, err)
@@ -145,6 +145,8 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	if err != nil {
 		return err
 	}
+	certBase64 := secret.Data[corev1.TLSCertKey]
+	certData, err := base64.StdEncoding.DecodeString(string(certBase64))
 	wrappedData := secret.Data[corev1.TLSPrivateKeyKey]
 	sgxctx := qa.qaSM.SgxContext
 	//try to clean up old key
@@ -156,6 +158,19 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	if err != nil {
 		// log.Error(err, "Failed to provision key to enclave")
 		return err
+	}
+
+	log.Info("Begin to add certificate data to credMap")
+	credMap := qa.qaSM.GetCredMap()
+	for port, cred := range credMap {
+		credName := cred.GetSGXKeyLable()
+		log.Info("CredName: ", credName)
+		if credName == signerName {
+			cred.SetCertData(certData)
+			qa.qaSM.SetCredMap(port, cred)
+			cred.DataSync <- struct{}{}
+			break
+		}
 	}
 
 	return nil

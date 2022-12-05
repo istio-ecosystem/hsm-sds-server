@@ -242,6 +242,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		VersionInfo: versionInfo,
 		Nonce:       nonce,
 	}
+	log.Info("Request ResourceNames: %v", req.ResourceNames)
 	for _, resourceName := range req.ResourceNames {
 		// TODO: Encapsulate these functions and do the following steps:
 		// Find the certificate in the secretManager cache
@@ -251,9 +252,41 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 
 		// Get cert from SecretManager Cache first
 		var cert []byte
+		// is a Gateway request from envoy or not
+		var isGateway bool
+		if resourceName != security.RootCertName && resourceName != security.WorkloadCertName {
+			isGateway = true
+		}
 		ns, isCA := s.st.GetCachedSecret(resourceName)
 		if isCA {
 			cert = ns.RootCert
+		} else if isGateway {
+			var myCred *security.GatewayCred
+			credMap := s.st.GetCredMap()
+			log.Info("Cred Map lenght: ", len(credMap))
+			resName := resourceName
+			for port, cred := range credMap {
+				lableKey := s.st.GetLableKeyWithPortForGateway(port)
+				newLableKey := security.HandleCredNameForEnvoy(resourceName)
+				log.Info("lableKey: ", lableKey)
+				if lableKey == newLableKey {
+					myCred = cred
+					resName = lableKey
+					break
+				}
+			}
+			if myCred == nil {
+				myCred = &security.GatewayCred {}
+				myCred.SetSGXKeyLable(resName)
+			}
+			log.Info("wait for certificate data")
+			<- myCred.DataSync
+			log.Info("certificate data arrive")
+			cert = myCred.GetCertData()
+			log.Info("certificate data: ", cert)
+			if cert == nil {
+				return nil, fmt.Errorf("no available certificate for resource [%s]: %v", resName, err)
+			}
 		} else if ns == nil {
 			log.Infof("DEBUG: cache secret is nil, generate new certificate")
 			// cert, err = s.st.GenerateSecret(resourceName)
@@ -288,7 +321,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				},
 			}
 		} else {
-			s.toEnvoyWorkloadSecret(secret, cert)
+			s.toEnvoySecret(secret, cert, isGateway)
 		}
 
 		res := MessageToAny(secret)
@@ -357,7 +390,7 @@ func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.Discov
 	}
 	// register the new generated secret
 	s.registerSecret(secretItem, resourceName)
-	s.toEnvoyWorkloadSecret(secret, cert)
+	s.toEnvoySecret(secret, cert, false)
 	res := MessageToAny(secret)
 	resp.Resources = append(resp.Resources, MessageToAny(&discovery.Resource{
 		Name:     resourceName,
@@ -490,16 +523,20 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 
 }
 
-// toEnvoyWorkloadSecret add generated cert and sgx configs to tls.Secret
-func (s *sdsservice) toEnvoyWorkloadSecret(secret *tlsv3.Secret, cert []byte) {
-	conf := MessageToAny(&sgxv3alpha.SgxPrivateKeyMethodConfig{
+// toEnvoySecret add generated cert and sgx configs to tls.Secret
+func (s *sdsservice) toEnvoySecret(secret *tlsv3.Secret, cert []byte, isGateway bool) {
+	sgxPKMC := &sgxv3alpha.SgxPrivateKeyMethodConfig{
 		SgxLibrary: s.st.SgxConfigs.HSMConfigPath,
 		KeyLabel:   s.st.SgxConfigs.HSMKeyLabel,
 		UsrPin:     s.st.SgxConfigs.HSMUserPin,
 		SoPin:      s.st.SgxConfigs.HSMSoPin,
 		TokenLabel: s.st.SgxConfigs.HSMTokenLabel,
 		KeyType:    s.st.SgxConfigs.HSMKeyType,
-	})
+	}
+	if isGateway {
+		sgxPKMC.KeyLabel = security.HandleCredNameForEnvoy(secret.Name)
+	}
+	conf := MessageToAny(sgxPKMC)
 
 	secret.Type = &tlsv3.Secret_TlsCertificate{
 		TlsCertificate: &tlsv3.TlsCertificate{

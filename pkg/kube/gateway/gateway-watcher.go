@@ -34,7 +34,6 @@ const (
 	KMRABased              = "KMRA"
 	asRootCA               = true
 	defaultCertPrefix      = "init-cert."
-	sdsCredNamePrefix      = "sds://"
 )
 
 type GatewayWatcher struct {
@@ -78,10 +77,14 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 		for _, gwServer := range gwServers {
 			if gwTLS := gwServer.GetTls(); gwTLS != nil {
 				credName := gwTLS.GetCredentialName()
-				if credName != "" && strings.HasPrefix(credName, sdsCredNamePrefix) {
+				if credName != "" && strings.HasPrefix(credName, security.SDSCredNamePrefix) {
 					log.Infof("Credential Name of the gatway is [%s]", credName)
-					credNames = append(credNames, credName)
-					gw.gwSM.SetCredNameMap(gwServer.Port, credName)
+					newCredName := security.HandleCredNameForEnvoy(credName)
+					credNames = append(credNames, newCredName)
+					var gatewayCred security.GatewayCred
+					gatewayCred.SetSGXKeyLable(newCredName)
+					gatewayCred.DataSync = make(chan struct{})
+					gw.gwSM.SetCredMap(gwServer.Port, &gatewayCred)
 				} else {
 					log.Errorf("error: no required gateway %s CredentialName for the sds server", gatewayCR.Name)
 					return

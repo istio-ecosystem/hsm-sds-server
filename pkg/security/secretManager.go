@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ const (
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
 	PendingSelfSignerName      = "clusterissuers.tcs.intel.com/istio-system"
+	SDSCredNamePrefix          = "sds://"
 	// Max retry time to get signed certificate in kubernetes csr
 	MAXRetryTime = 5
 	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
@@ -52,12 +54,19 @@ type SecretManager struct {
 	secretHandler func(resourceName string)
 }
 
+type GatewayCred struct {
+	sgxKeyLable string
+	certData    []byte
+	rootData    []byte
+	DataSync    chan struct{}
+}
+
 type SecretCache struct {
-	mu          sync.RWMutex
-	workload    *SecretItem
-	rootCert    []byte
-	csrBytes    []byte
-	credNameMap map[*istioapi.Port]string
+	mu       sync.RWMutex
+	workload *SecretItem
+	rootCert []byte
+	csrBytes []byte
+	credMap  map[*istioapi.Port]*GatewayCred
 }
 
 type SecretItem struct {
@@ -406,33 +415,70 @@ func (s *SecretCache) GetcsrBytes() (csrBytes []byte) {
 	return s.csrBytes
 }
 
-func (sc *SecretManager) GetCredNameMap() map[*istioapi.Port]string {
-	if sc.Cache.credNameMap == nil {
-		sc.Cache.credNameMap = make(map[*istioapi.Port]string)
+func (sc *SecretManager) GetCredMap() map[*istioapi.Port]*GatewayCred {
+	if sc.Cache.credMap == nil {
+		sc.Cache.credMap = make(map[*istioapi.Port]*GatewayCred)
 	}
-	return sc.Cache.credNameMap
+	return sc.Cache.credMap
 }
 
-func (sc *SecretManager) GetCredNameMapWithPort(port *istioapi.Port) string {
-	if sc.Cache.credNameMap != nil {
-		return sc.Cache.credNameMap[port]
+func (sc *SecretManager) GetCredWithPort(port *istioapi.Port) *GatewayCred {
+	if sc.Cache.credMap != nil {
+		return sc.Cache.credMap[port]
+	}
+	return nil
+}
+
+func (sc *SecretManager) GetLableKeyWithPortForGateway(port *istioapi.Port) string {
+	if sc.Cache.credMap != nil {
+		return sc.Cache.credMap[port].sgxKeyLable
 	}
 	return ""
 }
 
-func (sc *SecretManager) SetCredNameMap(port *istioapi.Port, credName string) {
+func (sc *SecretManager) GetCertWithPortForGateway(port *istioapi.Port) []byte {
+	if sc.Cache.credMap != nil {
+		return sc.Cache.credMap[port].certData
+	}
+	return nil
+}
+
+func (sc *SecretManager) GetCAWithPortForGateway(port *istioapi.Port) []byte {
+	if sc.Cache.credMap != nil {
+		return sc.Cache.credMap[port].rootData
+	}
+	return nil
+}
+
+func (sc *SecretManager) SetCredMap(port *istioapi.Port, cred *GatewayCred) {
 	sc.Cache.mu.RLock()
 	defer sc.Cache.mu.RUnlock()
-	if sc.Cache.credNameMap == nil {
-		sc.Cache.credNameMap = make(map[*istioapi.Port]string)
+	if sc.Cache.credMap == nil {
+		sc.Cache.credMap = make(map[*istioapi.Port]*GatewayCred)
 	}
-	sc.Cache.credNameMap[port] = credName
+	sc.Cache.credMap[port] = cred
 }
 
 func (sc *SecretManager) RegisterSecretHandler(h func(resourceName string)) {
 	sc.SgxctxLock.Lock()
 	defer sc.SgxctxLock.Unlock()
 	sc.secretHandler = h
+}
+
+func (gwC *GatewayCred) GetSGXKeyLable() string {
+	return gwC.sgxKeyLable
+}
+
+func (gwC *GatewayCred) SetSGXKeyLable(keyLable string) {
+	gwC.sgxKeyLable = keyLable
+}
+
+func (gwC *GatewayCred) GetCertData() []byte {
+	return gwC.certData
+}
+
+func (gwC *GatewayCred) SetCertData(certData []byte) {
+	gwC.certData = certData
 }
 
 // GenCSRTemplate generates a certificateRequest template with the given options.
@@ -579,3 +625,15 @@ func (sc *SecretManager) NewCACertificate() (*x509.Certificate, *rsa.PrivateKey,
 
 	return cert, caPrivKey, nil
 }
+
+func HandleCredNameForEnvoy(credName string) string {
+	if credName == "" {
+		return credName
+	}
+	// remove the 'sds://' prefix
+	delPrefix := strings.TrimPrefix(credName, SDSCredNamePrefix)
+	// replace the '.' by '-'
+	newCredName := strings.ReplaceAll(delPrefix, ".", "-")
+	return newCredName
+}
+
