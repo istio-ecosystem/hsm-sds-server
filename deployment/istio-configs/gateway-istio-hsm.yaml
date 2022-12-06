@@ -35,7 +35,7 @@ spec:
           iQ==
           -----END CERTIFICATE-----
         certSigners:
-        - clusterissuers.cert-manager.io/istio-system
+        - clusterissuers.tcs.intel.com/istio-system
   values:
     global:
       imagePullPolicy: IfNotPresent
@@ -50,7 +50,7 @@ spec:
             - name: testsds
               image: sds-server/sds-server:latest
               imagePullPolicy: IfNotPresent
-              command: ["bash", "-c", "sleep 10s; ls -la /home/istio-proxy/sgx/lib; ./sds/sds-server"]
+              command: ["bash", "-c", "sleep 5s; ls -la /home/istio-proxy/sgx/lib; ./sds/sds-server"]
               lifecycle:
                 postStart:
                   exec:
@@ -69,6 +69,22 @@ spec:
               env:
               - name: MOCKSDS
                 value: mock-sds-server
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: SERVICE_ACCOUNT
+                valueFrom:
+                  fieldRef:
+                    fieldPath: spec.serviceAccountName
+              {{- with (valueOrDefault .MeshConfig.TrustDomain .Values.global.trustDomain)  }}
+              - name: TRUST_DOMAIN
+                value: "{{ . }}"
+              {{- end }}
               volumeMounts:
               - name: sds-server
                 mountPath: /tmp/testsocket1
@@ -100,9 +116,13 @@ spec:
                 mountPath: /opt/intel/cryptoapitoolkit/tokens
               resources:
                 limits:
+                  # cpu: 200m
+                  # memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
                 requests:
+                  # cpu: 200m
+                  # memory: 100Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
               env:
@@ -144,6 +164,18 @@ spec:
             env:
             - name: MOCKSDS
               value: mock-sds-server
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
             volumeMounts:
             - name: sds-server
               mountPath: /tmp/testsocket1
