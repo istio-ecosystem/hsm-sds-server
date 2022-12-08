@@ -241,15 +241,15 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 	log.Info("DEBUG SPIFFE ID: ", csrHostName)
 	options.Host = csrHostName.String()
 	if needQuoteExtension {
-		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false); err != nil {
+		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false, ""); err != nil {
 			return nil, fmt.Errorf("failed to generate sgx quote and public key %s", err)
 		}
-		quote, err := sc.SgxContext.Quote(false)
+		quote, err := sc.SgxContext.Quote(false, "")
 		if err != nil {
 			return nil, fmt.Errorf("get sgx quote error %s", err)
 		}
 
-		quotePubKey, err := sc.SgxContext.QuotePublicKey(false)
+		quotePubKey, err := sc.SgxContext.QuotePublicKey(false, "")
 		if err != nil {
 			return nil, fmt.Errorf("get quote public key error %s", err)
 		}

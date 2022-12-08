@@ -127,12 +127,8 @@ type SgxContext struct {
 	quotePubKey pkcs11.ObjectHandle
 	// generated quote
 	ctkQuote []byte
-	// private key used for gateway quote generation
-	gwQuotePrvKey pkcs11.ObjectHandle
-	// private key used for gateway quote generation
-	gwQuotePubKey pkcs11.ObjectHandle
-	// generated quote for gateway
-	gwCTKQuote []byte
+	// map for Gateway quote and key pair
+	gwQuoteAndKeyPair map[string]*GatewayQuoteAndKeyPair
 
 	cryptoCtx     *crypto11.Context
 	cryptoCtxLock sync.Mutex
@@ -153,6 +149,15 @@ type Config struct {
 	HSMKeyLabel   string
 	HSMKeyType    string
 	HSMConfigPath string
+}
+
+type GatewayQuoteAndKeyPair struct {
+	// private key used for gateway quote generation
+	GWQuotePrvKey pkcs11.ObjectHandle
+	// private key used for gateway quote generation
+	GWQuotePubKey pkcs11.ObjectHandle
+	// generated quote for gateway
+	GWCTKQuote []byte
 }
 
 func (cfg *Config) Validate() error {
@@ -184,6 +189,7 @@ func NewContext(cfg Config) (*SgxContext, error) {
 		cfg:                      &cfg,
 		log:                      ctrl.Log.WithName("SGX"),
 		pendingSelfSignedSigners: map[string]struct{}{},
+		gwQuoteAndKeyPair:        make(map[string]*GatewayQuoteAndKeyPair),
 	}
 	if err := ctx.reloadCryptoContext(); err != nil {
 		if err.Error() == "could not find PKCS#11 token" /* crypto11.errNotFoundError */ {
@@ -216,10 +222,11 @@ func (ctx *SgxContext) Destroy() {
 	ctx.destroyCryptoContext()
 }
 
-func (ctx *SgxContext) Quote(isGW bool) ([]byte, error) {
+func (ctx *SgxContext) Quote(isGW bool, credName string) ([]byte, error) {
 	var quote []byte
 	if isGW {
-		quote = ctx.gwCTKQuote
+		gwRes := ctx.gwQuoteAndKeyPair[credName]
+		quote = gwRes.GWCTKQuote
 	} else {
 		quote = ctx.ctkQuote
 	}
@@ -232,18 +239,17 @@ func (ctx *SgxContext) Quote(isGW bool) ([]byte, error) {
 
 // QuotePublicKey returns the base64 encoded key
 // used for quote generation
-func (ctx *SgxContext) QuotePublicKey(isGW bool) ([]byte, error) {
+func (ctx *SgxContext) QuotePublicKey(isGW bool, credName string) ([]byte, error) {
 	// ctx.p11CtxLock.Lock()
 	// defer ctx.p11CtxLock.Unlock()
 
 	var quotePubKey pkcs11.ObjectHandle
 	if isGW {
-		quotePubKey = ctx.gwQuotePubKey
+		gwRes := ctx.gwQuoteAndKeyPair[credName]
+		quotePubKey = gwRes.GWQuotePubKey
 	} else {
 		quotePubKey = ctx.quotePubKey
 	}
-	log.Info("Workload quote public key: ", ctx.quotePubKey)
-	log.Info("Gateway quote public key: ", ctx.gwQuotePubKey)
 	template := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
 		pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),
@@ -296,8 +302,10 @@ func (ctx *SgxContext) destroyP11Context() {
 		ctx.p11Ctx.Logout(ctx.p11Session)
 		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.quotePrvKey)
 		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.quotePubKey)
-		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.gwQuotePrvKey)
-		ctx.p11Ctx.DestroyObject(ctx.p11Session, ctx.gwQuotePubKey)
+		for _, gwRes := range ctx.gwQuoteAndKeyPair {
+			ctx.p11Ctx.DestroyObject(ctx.p11Session, gwRes.GWQuotePrvKey)
+			ctx.p11Ctx.DestroyObject(ctx.p11Session, gwRes.GWQuotePubKey)
+		}
 		ctx.p11Ctx.CloseSession(ctx.p11Session)
 		ctx.p11Ctx.Destroy()
 		ctx.p11Ctx = nil
@@ -535,10 +543,14 @@ func (ctx *SgxContext) RemoveKey(keyLabel string) error {
 	return nil
 }
 
-func (ctx *SgxContext) GenerateQuoteAndPublicKey(isGW bool) error {
+func (ctx *SgxContext) GenerateQuoteAndPublicKey(isGW bool, credName string) error {
 	var ctkQuote []byte
 	if isGW {
-		ctkQuote = ctx.gwCTKQuote
+		if gwRes, ok := ctx.gwQuoteAndKeyPair[credName]; ok {
+			ctkQuote = gwRes.GWCTKQuote
+		} else {
+			ctkQuote = nil
+		}
 	} else {
 		ctkQuote = ctx.ctkQuote
 	}
@@ -559,9 +571,12 @@ func (ctx *SgxContext) GenerateQuoteAndPublicKey(isGW bool) error {
 	}
 
 	if isGW {
-		ctx.gwQuotePubKey = pub
-		ctx.gwQuotePrvKey = priv
-		ctx.gwCTKQuote = quote
+		var gwQuoteAndKeyPair = &GatewayQuoteAndKeyPair{
+			GWQuotePubKey: pub,
+			GWQuotePrvKey: priv,
+			GWCTKQuote:    quote,
+		}
+		ctx.gwQuoteAndKeyPair[credName] = gwQuoteAndKeyPair
 	} else {
 		ctx.quotePubKey = pub
 		ctx.quotePrvKey = priv
@@ -628,7 +643,8 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 
 	var quotePrvKey pkcs11.ObjectHandle
 	if isGW {
-		quotePrvKey = ctx.gwQuotePrvKey
+		gwRes := ctx.gwQuoteAndKeyPair[keyLabel]
+		quotePrvKey = gwRes.GWQuotePrvKey
 	} else {
 		quotePrvKey = ctx.quotePrvKey
 	}

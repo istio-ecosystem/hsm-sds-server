@@ -20,6 +20,7 @@ import (
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 
+	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 )
 
@@ -42,6 +43,10 @@ type QuoteAttestationWatcher struct {
 	tcsClient  v1alpha1.TcsV1alpha1Interface
 	kubeClient kubernetes.Interface
 }
+
+var (
+	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
+)
 
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
@@ -129,6 +134,9 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
+		instanceName := quoteAttestationPrefix + PodName + "-" + signer
+		ctx := context.Background()
+		qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
 		statusErr = multierror.Append(statusErr, err)

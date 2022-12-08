@@ -23,6 +23,8 @@ import (
 	istioapi "istio.io/api/networking/v1alpha3"
 	gateway "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	gatewaylister "istio.io/client-go/pkg/listers/networking/v1alpha3"
+
+	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 )
 
@@ -44,6 +46,10 @@ type GatewayWatcher struct {
 	gwSM       *security.SecretManager
 	tcsClient  v1alpha1.TcsV1alpha1Interface
 }
+
+var (
+	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
+)
 
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (gw *GatewayWatcher) Run(stopCh chan struct{}) {
@@ -97,10 +103,10 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 		return
 	}
 
+	ctx := context.Background()
 	for _, credName := range credNames {
 		// create quoteAttestation CR for gateway CR
-		ctx := context.Background()
-		instanceName := quoteAttestationPrefix + gatewayCR.Name
+		instanceName := quoteAttestationPrefix + PodName + "-" + credName
 		if credName != "" {
 			if err := gw.QuoteAttestationDeliver(ctx, credName, instanceName, gatewayCR.Namespace); err != nil {
 				log.Errorf("failed to created or updated quoteAttestation CR %s", err)
@@ -191,16 +197,15 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 		log.Errorf("sgx context for this hsm custom resource has not been initialized")
 		return fmt.Errorf("sgx context for this hsm custom resource has not been initialized")
 	}
-
-	if err := sgxctx.GenerateQuoteAndPublicKey(true); err != nil {
+	if err := sgxctx.GenerateQuoteAndPublicKey(true, signerName); err != nil {
 		return fmt.Errorf("failed to generate sgx quote and public key %s", err)
 	}
-	quote, err := sgxctx.Quote(true)
+	quote, err := sgxctx.Quote(true, signerName)
 	if err != nil {
 		return fmt.Errorf("get sgx quote error %s", err)
 	}
 
-	publicKey, err := sgxctx.QuotePublicKey(true)
+	publicKey, err := sgxctx.QuotePublicKey(true, signerName)
 	if err != nil {
 		return fmt.Errorf("get public key error %s", err)
 	}
