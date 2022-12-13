@@ -532,7 +532,8 @@ func (ctx *SgxContext) RemoveKey(keyLabel string) error {
 	defer ctx.cryptoCtxLock.Unlock()
 	privKey, err := ctx.cryptoCtx.FindKeyPair(nil, []byte(keyLabel))
 	if err != nil {
-		return fmt.Errorf("can't find pkcs11 keypair: %v", err)
+		log.Infof("can't find pkcs11 keypair: %v", err)
+		return nil
 	}
 	if privKey != nil {
 		dErr := privKey.Delete()
@@ -718,12 +719,16 @@ func (ctx *SgxContext) RemoveKeyForSigner(name string) error {
 	defer ctx.cryptoCtxLock.Unlock()
 	signer, err := ctx.cryptoCtx.FindKeyPair(nil, []byte(name))
 	if err != nil {
-		return err
+		log.Infof("can't find pkcs11 keypair: %v", err)
+		return nil
 	}
 	if signer != nil {
 		dErr := signer.Delete()
 		if dErr != nil {
 			return dErr
+		}
+		if _, ok := ctx.gwQuoteAndKeyPair[name]; ok {
+			delete(ctx.gwQuoteAndKeyPair, name)
 		}
 	}
 	return nil

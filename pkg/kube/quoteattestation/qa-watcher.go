@@ -137,6 +137,7 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		instanceName := quoteAttestationPrefix + PodName + "-" + signer
 		ctx := context.Background()
 		qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
+		qa.kubeClient.CoreV1().Secrets(req.Namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
 		statusErr = multierror.Append(statusErr, err)
@@ -159,6 +160,10 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	sgxctx := qa.qaSM.SgxContext
 	//try to clean up old key
 	err = sgxctx.RemoveKeyForSigner(signerName)
+	if err != nil {
+		return err
+	}
+	err = sgxctx.RemoveKey(signerName)
 	if err != nil {
 		return err
 	}

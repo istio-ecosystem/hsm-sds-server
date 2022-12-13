@@ -122,6 +122,48 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	return
 }
 
+// onGatewayDelete is the delete event for Istio gateway
+func (gw *GatewayWatcher) onGatewayDelete(obj any) {
+	gatewayCR := obj.(*gateway.Gateway)
+	gwAPICR := istioapi.Gateway(gatewayCR.Spec)
+	gwSeletor := gwAPICR.GetSelector()
+	if gwSeletor == nil {
+		log.Errorf("error: istio gateway %s has not selector.", gatewayCR.Name)
+		return
+	}
+
+	sgxctx := gw.gwSM.SgxContext
+	if sgxctx == nil {
+		log.Errorf("sgx context for this hsm custom resource has not been initialized")
+		return
+	}
+
+	// fetch the credential name for gateway CR
+	gatewaySelector := labels.Instance(gwSeletor)
+	if gatewaySelector.SubsetOf(gw.gwPodLabel) {
+		gwServers := gwAPICR.GetServers()
+		for _, gwServer := range gwServers {
+			if gwTLS := gwServer.GetTls(); gwTLS != nil {
+				credName := gwTLS.GetCredentialName()
+				if credName != "" && strings.HasPrefix(credName, security.SDSCredNamePrefix) {
+					log.Infof("Credential Name of the gatway is [%s]", credName)
+					signerName := security.HandleCredNameForEnvoy(credName)
+					//delete the given key from signer and SGX enclave
+					err := sgxctx.RemoveKeyForSigner(signerName)
+					if err != nil {
+						log.Errorf("Remove Key %s for signer error: %v", signerName, err)
+					}
+					err = sgxctx.RemoveKey(signerName)
+					if err != nil {
+						log.Errorf("Remove Key %s from SGX enclave error: %v", signerName, err)
+					}
+				}
+			}
+		}
+	}
+
+}
+
 func (gw *GatewayWatcher) Reconcile(req types.NamespacedName) error {
 	log.Info("Start to run GatewayWatcher Reconcile")
 	log := log.WithLabels("istio gateway", req)
@@ -161,6 +203,7 @@ func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*Gateway
 	gw.gwInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj any) { gw.onGatewayAdd(obj) },
+			DeleteFunc: func(obj any) { gw.onGatewayDelete(obj) },
 		},
 	)
 
