@@ -7,24 +7,30 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"github.com/spf13/cobra"
 	"istio.io/pkg/log"
 
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 )
 
 const (
-	maxStreams       = 100000
-	maxRetryTimes    = 5
-	maxMsgSize       = 20*1024*1024
+	maxStreams    = 100000
+	maxRetryTimes = 5
+	maxMsgSize    = 20 * 1024 * 1024
 )
 
 var (
-	timeoutSeconds       int
-	periodMillis         int
-	url                  string
+	sgxLibNames = []string{"libp11SgxEnclave.signed.so", "libp11sgx.so",
+		"libsgx_dcap_ql.so.1", "libsgx_enclave_common.so.1",
+		"libsgx_pce_logic.so.1", "libsgx_qe3_logic.so", "libsgx_urts.so"}
+)
+
+var (
+	timeoutSeconds int
+	periodMillis   int
+	url            string
 
 	waitCmd = &cobra.Command{
 		Use:   "wait",
@@ -48,8 +54,14 @@ var (
 						err = mTLSErr
 						continue
 					}
-					if mTLSExists {
-						log.Infof("UDS file %s found, mTLS SDS server is ready!", security.WorkloadIdentitySocketPath)
+					sgxLibReady, libErr := checkSGXLibs(security.SgxLibraryPrefix)
+					if libErr != nil {
+						log.Info("Not ready yet for mTLS SDS server error: ", libErr)
+						err = libErr
+						continue
+					}
+					if mTLSExists && sgxLibReady {
+						log.Infof("UDS file %s and SGX Libs %s found, mTLS SDS server is ready!", security.WorkloadIdentitySocketPath, security.SgxLibraryPrefix)
 						return nil
 					}
 				}
@@ -81,6 +93,23 @@ func checkSocket(ctx context.Context, socketPath string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// Checks whether the sgx required library exists?
+func checkSGXLibs(sgxLibPathPrefix string) (bool, error) {
+	var sgxlibpath string
+	libReady := true
+	for _, name := range sgxLibNames {
+		sgxlibpath = sgxLibPathPrefix + name
+		fi, err := os.Stat(sgxlibpath)
+		if err != nil || !fi.Mode().IsRegular() {
+			libReady = false
+			log.Infof("%s is not ready", sgxlibpath)
+		} else {
+			log.Infof("find %s", sgxlibpath)
+		}
+	}
+	return libReady, nil
 }
 
 func socketFileExists(path string) bool {
