@@ -89,7 +89,8 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 					credNames = append(credNames, newCredName)
 					var gatewayCred security.GatewayCred
 					gatewayCred.SetSGXKeyLable(newCredName)
-					gatewayCred.DataSync = make(chan struct{})
+					gatewayCred.CertSync = make(chan struct{})
+					gatewayCred.RootSync = make(chan struct{})
 					gw.gwSM.SetCredMap(gwServer.Port, &gatewayCred)
 				} else {
 					log.Errorf("error: no required gateway %s CredentialName for the sds server", gatewayCR.Name)

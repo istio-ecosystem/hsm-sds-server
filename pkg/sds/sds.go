@@ -252,11 +252,11 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 
 		// Get cert from SecretManager Cache first
 		var cert []byte
+		// This rootCA is of gateway's mTLS rootCA from client
+		var gwRootCA []byte
 		// is a Gateway request from envoy or not
-		var isGateway bool
-		if resourceName != security.RootCertName && resourceName != security.WorkloadCertName {
-			isGateway = true
-		}
+		var isGateway bool = strings.HasPrefix(resourceName, security.SDSCredNamePrefix)
+
 		ns, isCA := s.st.GetCachedSecret(resourceName)
 		if isCA {
 			cert = ns.RootCert
@@ -267,9 +267,10 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			resName := resourceName
 			for port, cred := range credMap {
 				lableKey := s.st.GetLableKeyWithPortForGateway(port)
-				newLableKey := security.HandleCredNameForEnvoy(resourceName)
+				sdsPrefixLableKey := security.HandleCredNameForEnvoy(resourceName)
+				sdsSuffixLableKey := strings.TrimSuffix(sdsPrefixLableKey, security.SDSCredNameSuffix)
 				log.Info("lableKey: ", lableKey)
-				if lableKey == newLableKey {
+				if lableKey == sdsPrefixLableKey || lableKey == sdsSuffixLableKey {
 					myCred = cred
 					resName = lableKey
 					break
@@ -279,13 +280,25 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				myCred = &security.GatewayCred {}
 				myCred.SetSGXKeyLable(resName)
 			}
-			log.Info("wait for certificate data")
-			<- myCred.DataSync
-			log.Info("certificate data arrive")
-			cert = myCred.GetCertData()
-			log.Info("certificate data: ", cert)
-			if cert == nil {
-				return nil, fmt.Errorf("no available certificate for resource [%s]: %v", resName, err)
+
+			if !strings.HasSuffix(resourceName, security.SDSCredNameSuffix) {
+				log.Info("wait for certificate data")
+				<- myCred.CertSync
+				log.Info("certificate data arrive")
+				cert = myCred.GetCertData()
+				log.Info("certificate data: ", cert)
+				if cert == nil {
+					return nil, fmt.Errorf("no available certificate for resource [%s]", resName)
+				}
+			} else {
+				log.Info("wait for rootCA data")
+				<- myCred.RootSync
+				log.Info("rootCA data arrive")
+				gwRootCA = myCred.GetRootData()
+				log.Info("root CA data: ", gwRootCA)
+				if gwRootCA == nil {
+					return nil, fmt.Errorf("no available rootCA for resource [%s]", resName)
+				}
 			}
 		} else if ns == nil {
 			log.Infof("DEBUG: cache secret is nil, generate new certificate")
@@ -316,6 +329,16 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 					TrustedCa: &corev3.DataSource{
 						Specifier: &corev3.DataSource_InlineBytes{
 							InlineBytes: cert,
+						},
+					},
+				},
+			}
+		} else if isGateway && strings.HasSuffix(resourceName, security.SDSCredNameSuffix) && gwRootCA != nil {
+			secret.Type = &tlsv3.Secret_ValidationContext{
+				ValidationContext: &tlsv3.CertificateValidationContext{
+					TrustedCa: &corev3.DataSource{
+						Specifier: &corev3.DataSource_InlineBytes{
+							InlineBytes: gwRootCA,
 						},
 					},
 				},
@@ -537,7 +560,6 @@ func (s *sdsservice) toEnvoySecret(secret *tlsv3.Secret, cert []byte, isGateway 
 		sgxPKMC.KeyLabel = security.HandleCredNameForEnvoy(secret.Name)
 	}
 	conf := MessageToAny(sgxPKMC)
-
 	secret.Type = &tlsv3.Secret_TlsCertificate{
 		TlsCertificate: &tlsv3.TlsCertificate{
 			CertificateChain: &corev3.DataSource{

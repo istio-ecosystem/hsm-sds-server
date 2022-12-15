@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -154,8 +155,16 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	if err != nil {
 		return err
 	}
+	rootCABase64 := secret.Data[corev1.ServiceAccountRootCAKey]
+	rootCAData, err := base64.StdEncoding.DecodeString(string(rootCABase64))
+	if err != nil {
+		return err
+	}
 	certBase64 := secret.Data[corev1.TLSCertKey]
 	certData, err := base64.StdEncoding.DecodeString(string(certBase64))
+	if err != nil {
+		return err
+	}
 	wrappedData := secret.Data[corev1.TLSPrivateKeyKey]
 	sgxctx := qa.qaSM.SgxContext
 	//try to clean up old key
@@ -173,15 +182,40 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 		return err
 	}
 
-	log.Info("Begin to add certificate data to credMap")
+	log.Info("Begin to add certificate/rootCA data to credMap")
 	credMap := qa.qaSM.GetCredMap()
 	for port, cred := range credMap {
 		credName := cred.GetSGXKeyLable()
 		log.Info("CredName: ", credName)
 		if credName == signerName {
-			cred.SetCertData(certData)
+			var wg sync.WaitGroup
+			if certData != nil {
+				log.Info("certData is not empty")
+				wg.Add(1)
+				cred.SetCertData(certData)
+			}
+			if rootCAData != nil {
+				log.Info("rootCAData is not empty")
+				wg.Add(1)
+				cred.SetRootData(rootCAData)
+			}
 			qa.qaSM.SetCredMap(port, cred)
-			cred.DataSync <- struct{}{}
+
+			go func() {
+				defer wg.Done()
+				if certData != nil {
+					cred.CertSync <- struct{}{}
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				if rootCAData != nil {
+					cred.RootSync <- struct{}{}
+				}
+			}()
+
+			wg.Wait()
 			break
 		}
 	}

@@ -31,6 +31,7 @@ const (
 	WorkloadCertName           = "default"
 	PendingSelfSignerName      = "clusterissuers.tcs.intel.com/istio-system"
 	SDSCredNamePrefix          = "sds://"
+	SDSCredNameSuffix          = "-cacert"
 	// Max retry time to get signed certificate in kubernetes csr
 	MAXRetryTime = 5
 	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
@@ -58,7 +59,8 @@ type GatewayCred struct {
 	sgxKeyLable string
 	certData    []byte
 	rootData    []byte
-	DataSync    chan struct{}
+	CertSync    chan struct{}
+	RootSync    chan struct{}
 }
 
 type SecretCache struct {
@@ -479,6 +481,14 @@ func (gwC *GatewayCred) GetCertData() []byte {
 
 func (gwC *GatewayCred) SetCertData(certData []byte) {
 	gwC.certData = certData
+}
+
+func (gwC *GatewayCred) GetRootData() []byte {
+	return gwC.rootData
+}
+
+func (gwC *GatewayCred) SetRootData(rootData []byte) {
+	gwC.rootData = rootData
 }
 
 // GenCSRTemplate generates a certificateRequest template with the given options.
