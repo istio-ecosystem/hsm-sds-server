@@ -26,6 +26,7 @@ import (
 const (
 	WorkloadIdentitySocketPath = "/var/run/secrets/workload-spiffe-uds/socket"
 	GatewayIdentitySocketPath  = "/var/run/secrets/credential-uds/socket"
+	SgxLibraryPrefix           = "/home/istio-proxy/sgx/lib/"
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
@@ -646,4 +647,3 @@ func HandleCredNameForEnvoy(credName string) string {
 	newCredName := strings.ReplaceAll(delPrefix, ".", "-")
 	return newCredName
 }
-

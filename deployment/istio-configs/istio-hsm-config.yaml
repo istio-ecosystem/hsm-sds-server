@@ -50,7 +50,6 @@ spec:
             - name: testsds
               image: sds-server/sds-server:latest
               imagePullPolicy: IfNotPresent
-              command: ["bash", "-c", "sleep 5s; ls -la /home/istio-proxy/sgx/lib; ./sds/sds-server"]
               lifecycle:
                 postStart:
                   exec:
