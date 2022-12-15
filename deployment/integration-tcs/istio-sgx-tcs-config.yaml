@@ -30,6 +30,11 @@ spec:
                   - signers
                   verbs:
                   - approve
+                  - get
+                  - patch
+                  - delete
+                  - watch
+                  - update
   meshConfig:
     defaultConfig:
       proxyMetadata:
@@ -77,9 +82,8 @@ spec:
           spec:
             containers:
             - name: testsds
-              image: registry.fi.intel.com/xintongc/sds-server:tcs
+              image: registry.fi.intel.com/xintongc/sds-server:tcsv2
               imagePullPolicy: IfNotPresent
-              command: ["bash", "-c", "sleep 5s; ls -la /home/istio-proxy/sgx/lib; ./sds/sds-server"]
               lifecycle:
                 postStart:
                   exec:
