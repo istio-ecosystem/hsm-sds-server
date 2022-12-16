@@ -46,10 +46,6 @@ type GatewayWatcher struct {
 	tcsClient  v1alpha1.TcsV1alpha1Interface
 }
 
-// var (
-// 	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
-// )
-
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (gw *GatewayWatcher) Run(stopCh chan struct{}) {
 	log.Info("Start to run GatewayWatcher")

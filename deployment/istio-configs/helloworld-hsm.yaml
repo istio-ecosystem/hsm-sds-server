@@ -18,8 +18,12 @@ rules:
   resources: ["quoteattestations"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["certificates.k8s.io"]
-  resources: ["certificatesigningrequests", "certificatesigningrequests/approval"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "approval"]
+  resources: ["certificatesigningrequests", "certificatesigningrequests/approval", "certificatesigningrequests/status"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["certificates.k8s.io"]
+  resourceNames: [tcsclusterissuer.tcs.intel.com/*]
+  resources: ["signers"]
+  verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

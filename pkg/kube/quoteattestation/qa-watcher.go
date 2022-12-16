@@ -43,10 +43,6 @@ type QuoteAttestationWatcher struct {
 	kubeClient kubernetes.Interface
 }
 
-// var (
-// 	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
-// )
-
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
 	log.Info("Start to run QuoteAttestationWatcher")
