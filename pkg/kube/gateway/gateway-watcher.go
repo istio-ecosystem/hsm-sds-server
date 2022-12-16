@@ -24,7 +24,6 @@ import (
 	gateway "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	gatewaylister "istio.io/client-go/pkg/listers/networking/v1alpha3"
 
-	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 )
 
@@ -47,9 +46,9 @@ type GatewayWatcher struct {
 	tcsClient  v1alpha1.TcsV1alpha1Interface
 }
 
-var (
-	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
-)
+// var (
+// 	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
+// )
 
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (gw *GatewayWatcher) Run(stopCh chan struct{}) {
@@ -107,7 +106,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	ctx := context.Background()
 	for _, credName := range credNames {
 		// create quoteAttestation CR for gateway CR
-		instanceName := quoteAttestationPrefix + PodName + "-" + credName
+		instanceName := quoteAttestationPrefix + security.PodName + "-" + credName
 		if credName != "" {
 			if err := gw.QuoteAttestationDeliver(ctx, credName, instanceName, gatewayCR.Namespace); err != nil {
 				log.Errorf("failed to created or updated quoteAttestation CR %s", err)
@@ -210,7 +209,7 @@ func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*Gateway
 
 	gw.gwInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj any) { gw.onGatewayAdd(obj) },
+			AddFunc:    func(obj any) { gw.onGatewayAdd(obj) },
 			DeleteFunc: func(obj any) { gw.onGatewayDelete(obj) },
 		},
 	)
@@ -251,7 +250,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 	if err := sgxctx.GenerateQuoteAndPublicKey(true, signerName); err != nil {
 		return fmt.Errorf("failed to generate sgx quote and public key %s", err)
 	}
-	quote, err := sgxctx.Quote(true, signerName)
+	quote, _, err := sgxctx.QuoteandNonce(true, signerName)
 	if err != nil {
 		return fmt.Errorf("get sgx quote error %s", err)
 	}

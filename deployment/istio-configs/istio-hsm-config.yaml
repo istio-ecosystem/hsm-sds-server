@@ -6,36 +6,71 @@ spec:
   profile: default
   hub: "istio"
   tag: "sgx-1122"
+  components:
+    pilot:
+      k8s:
+        env:
+          - name: CERT_SIGNER_DOMAIN
+            value: tcsclusterissuer.tcs.intel.com
+          - name: EXTERNAL_CA
+            value: ISTIOD_RA_KUBERNETES_API
+          - name: PILOT_CERT_PROVIDER
+            value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
+        overlays:
+          - kind: ClusterRole
+            name: istiod-clusterrole-istio-system
+            patches:
+              - path: rules[-1]
+                value: |
+                  apiGroups:
+                  - certificates.k8s.io
+                  resourceNames:
+                  - tcsclusterissuer.tcs.intel.com/*
+                  resources:
+                  - signers
+                  verbs:
+                  - approve
+                  - get
+                  - list
+                  - patch
+                  - delete
+                  - watch
+                  - update
   meshConfig:
     defaultConfig:
       proxyMetadata:
-        ISTIO_META_CERT_SIGNER: istio-system
+        PROXY_CONFIG_XDS_AGENT: "true"
+        ISTIO_META_CERT_SIGNER: sgx-signer
     caCertificates:
       - pem: |
           -----BEGIN CERTIFICATE-----
-          MIIDjTCCAnWgAwIBAgIUflG9UK6yXg9qY/jbLVMKr95ZDWwwDQYJKoZIhvcNAQEL
-          BQAwVjELMAkGA1UEBhMCR0IxDzANBgNVBAcMBkxvbmRvbjEWMBQGA1UECgwNY2x1
-          c3Rlci5sb2NhbDEeMBwGA1UEAwwVd3d3LmNsdXN0ZXIubG9jYWwuY29tMB4XDTIy
-          MTEyMzA2MDEwNloXDTIzMTEyMzA2MDEwNlowVjELMAkGA1UEBhMCR0IxDzANBgNV
-          BAcMBkxvbmRvbjEWMBQGA1UECgwNY2x1c3Rlci5sb2NhbDEeMBwGA1UEAwwVd3d3
-          LmNsdXN0ZXIubG9jYWwuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
-          AQEA0LTkl5e51NjHO6FyU3CrYN5tYsSoXbzFu6jnFxixoqZ+ub/hWR0tJx8CjlLG
-          q12gL0qmQA2INLpV4CjQaCNYl6Je8kXTfBGddNCHyVRER+Ygjlec1hB2sAsJOv9d
-          mi4m0fUtcqGppyUHx8ZUsmydrkMSQitqE1S8IRw41eVs2BHYmLm8t9LIvgBZX+T5
-          hKPbg9rJN90cN3k3wvw7sUpn2QXkyuCcRPr75J1vfliStZN2UDwlFt+UjUd8npic
-          NiKpm7k45hHsAwTusveV8ponOKcCLpnCcg+AU/p3ZCF9AcT53RM4pkquNkMr2ckb
-          lkEPGgk1Cyy4w8osiiJaTuw5zwIDAQABo1MwUTAdBgNVHQ4EFgQUDsTPVhGa6Icg
-          zXgsTsIILK7GpvIwHwYDVR0jBBgwFoAUDsTPVhGa6IcgzXgsTsIILK7GpvIwDwYD
-          VR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAE0dMKnDJOqphEx3uxLlX
-          2T4SOoiqzy2SFFMXCYp29e0EJT+rvzpZbyfMs+BSh8519Llt5nU430NK4Ldt2OA0
-          GzP8cBlZvuMMlQ7ILjcj3VfP/quTxHQbdvey1xOhQCgdqbM+2cEoVNXdBE5xf+m8
-          IqEcSuU8jLxgc8gwGOPyMogujgLu5hXH55zTHovd2Zh1c68bIY5j4Q91Pu0WuSHT
-          aqueCcnfKnSALwwJbqVMg0Ib3qzUl2rmsHoUqxaJt+rC/nzOE9Pdb1nHPpqrN0iU
-          bNikPzSBIpVCDL3B6cjbsYjcWm9sSQMapBIqDDbyjitz8tLHfCqG1WBPxHHgV9ix
-          iQ==
+          MIIEbDCCAtSgAwIBAgIIOANo/iO8CsMwDQYJKoZIhvcNAQELBQAwVDEdMBsGA1UE
+          ChMUSW50ZWwoUikgQ29ycG9yYXRpb24xMzAxBgNVBAMTKlNHWCBzZWxmLXNpZ25l
+          ZCByb290IGNlcnRpZmljYXRlIGF1dGhvcml0eTAeFw0yMjEyMTYwNjQ3MjdaFw0y
+          MzEyMTYwNjQ3MjdaMFQxHTAbBgNVBAoTFEludGVsKFIpIENvcnBvcmF0aW9uMTMw
+          MQYDVQQDEypTR1ggc2VsZi1zaWduZWQgcm9vdCBjZXJ0aWZpY2F0ZSBhdXRob3Jp
+          dHkwggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQDyUFLLNrGYUBmFFYst
+          5seTG9HCevFLtETcA6qgUheHbx65bjTd/ohjHtv/Gy3dqk4HC4mhr/hiurzTDgR4
+          X00IhLd0uNtfn2Z3+XOkBHn5Rurtj1ZZ+f3jSVAGJF4bzhBS2zsUJYDw8XCMpdPq
+          fQo89fQ4OW2zOMgyOaoE4tKrwDT+3jBKygA22l2rnUOXYtKbPI8mOsK7BRuIWN4G
+          9ECVNEXsozLafhd8jXuCP89eTII0qdw9mJTYsp0A5U3R0rJ6Xs0qul75lAHSLY0G
+          WlG9c+n8G1lXBXxzvoT2kdCtMyRoiJvAT5hNzgTEeuxkQxiSRL5MVq+Qum9EUS8u
+          9NYK13PoDPHUMejfHlE+n8bs7dAQ1rIJHvuO8uHv49cp5/ta0Bd8ggNvNAubMw/A
+          9iQYNNuwbQ2EvaEID02n175xefVEUv/lUfyZ7Qu2CEcN+FfXdCj38DbrZ/Z+hnZv
+          oPqFxobf3wW6zFJXMGNlhJfyMmd+OO8+tUPTXtKZu0sbx2ECAwEAAaNCMEAwDgYD
+          VR0PAQH/BAQDAgKkMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFIC7hkPuHPAu
+          c78eqYeOiQ2XdtrYMA0GCSqGSIb3DQEBCwUAA4IBgQA6mcyDUp3ForwHNxWN9gqK
+          93AEuDAGNI6HGzz5lt/Bfy7am23/Af/WttHtrTeZd8AU32wjH2Tn5x4aLwaDw5QR
+          D2EK2lU5ziBaoQicjtI512Y0AEJodFiXvXztixhsGZdLtifbuNOlXZ4EoWV0g6e/
+          XEko2MQQ9YLD+WbYhlsc2WRux95N25rJU5jzSUT1Y32W9/ODmuA7jzrGmYKWzMLU
+          NKNj2bXR4tnLTHduwHD1pCohP5qLkYBLNY720hltZamQl2LPciGCprnnHQrUKKyC
+          fuvTib/RCS5/qUry58cHfSpdQis1A7MlQspiGggFQf7pqsVfhZtoY1SVvOx/Dzyo
+          9Agfb0dzE11n8UjXoDQwAmdeWLbfw6R3uLVtPlwdgq7n4JNE6XVFBxWwLd+Pt/Zo
+          UTvTPM8ezRiVplq1beuQXVRHH1Bzxedq1R02v/DLkH0dMeSyMU1VS3+HRgOeHXWr
+          ccpv5ngljFfyux9TknYH8Eb85N1Io7JA/Vm9eYv9MJE=
           -----END CERTIFICATE-----
         certSigners:
-        - clusterissuers.tcs.intel.com/istio-system
+        - tcsclusterissuer.tcs.intel.com/sgx-signer
   values:
     global:
       imagePullPolicy: IfNotPresent
@@ -68,6 +103,10 @@ spec:
               env:
               - name: MOCKSDS
                 value: mock-sds-server
+              - name: NEED_QUOTE
+                value: "false"
+              - name: RANDOM_NONCE
+                value: "true"
               - name: POD_NAME
                 valueFrom:
                   fieldRef:
@@ -84,6 +123,12 @@ spec:
               - name: TRUST_DOMAIN
                 value: "{{ . }}"
               {{- end }}
+              - name: CERT_SIGNER_DOMAIN
+                value: tcsclusterissuer.tcs.intel.com
+              - name: EXTERNAL_CA
+                value: ISTIOD_RA_KUBERNETES_API
+              - name: PILOT_CERT_PROVIDER
+                value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
               volumeMounts:
               - name: sds-server
                 mountPath: /tmp/testsocket1
@@ -127,6 +172,12 @@ spec:
               env:
               - name: GREETING
                 value: hello-world
+              - name: CERT_SIGNER_DOMAIN
+                value: tcsclusterissuer.tcs.intel.com
+              - name: EXTERNAL_CA
+                value: ISTIOD_RA_KUBERNETES_API
+              - name: PILOT_CERT_PROVIDER
+                value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
             volumes:
             - name: sds-server
               hostPath: 
