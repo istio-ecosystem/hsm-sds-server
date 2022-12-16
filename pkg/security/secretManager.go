@@ -7,8 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"math"
@@ -32,14 +30,11 @@ const (
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
-	PendingSelfSignerName      = "tcsclusterissuer.tcs.intel.com/sgx-signer"
+	PendingSelfSignerName      = "clusterissuers.tcs.intel.com/istio-system"
 	SDSCredNamePrefix          = "sds://"
 	SDSCredNameSuffix          = "-cacert"
 	// Max retry time to get signed certificate in kubernetes csr
-	CertWatchTimeout = 60 * time.Second
-	// The interval for reading a certificate
-	CertReadInterval = 500 * time.Millisecond
-	MAXRetryTime     = 20
+	MAXRetryTime = 5
 	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
 )
 
@@ -190,12 +185,10 @@ type CertOptions struct {
 var (
 	TrustDomain = env.RegisterStringVar("TRUST_DOMAIN", "cluster.local",
 		"The trust domain for spiffe certificates").Get()
-	WorkloadNamespace  = env.RegisterStringVar("POD_NAMESPACE", "default", "").Get()
-	PodName            = env.RegisterStringVar("POD_NAME", "default", "").Get()
-	ServiceAccount     = env.RegisterStringVar("SERVICE_ACCOUNT", "default", "Name of service account").Get()
-	NeedQuoteExtension = env.RegisterBoolVar("NEED_QUOTE", true, "If need to add quote extension in csr").Get()
+	WorkloadNamespace = env.RegisterStringVar("POD_NAMESPACE", "default", "").Get()
+	ServiceAccount    = env.RegisterStringVar("SERVICE_ACCOUNT", "default", "Name of service account").Get()
 
-	SecretRotationGracePeriodRatioEnv = env.Register("SECRET_GRACE_PERIOD_RATIO", 0.5,
+	secretRotationGracePeriodRatioEnv = env.Register("SECRET_GRACE_PERIOD_RATIO", 0.5,
 		"The grace period ratio for the cert rotation, by default 0.5.").Get()
 )
 
@@ -216,7 +209,7 @@ func (sc *SecretManager) GenerateSecret(resourceName string) ([]byte, error) {
 			return nil, fmt.Errorf("%v cert not found", resourceName)
 		}
 	} else {
-		csrBytes, err := sc.GenerateCSR(*sc.ConfigOptions, NeedQuoteExtension)
+		csrBytes, err := sc.GenerateCSR(*sc.ConfigOptions, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
 		}
@@ -254,21 +247,21 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false, ""); err != nil {
 			return nil, fmt.Errorf("failed to generate sgx quote and public key %s", err)
 		}
-		quote, nonce, err := sc.SgxContext.QuoteandNonce(false, "")
+		quote, err := sc.SgxContext.Quote(false, "")
 		if err != nil {
-			return nil, fmt.Errorf("get sgx quote or nonce error %s", err)
+			return nil, fmt.Errorf("get sgx quote error %s", err)
 		}
 
 		quotePubKey, err := sc.SgxContext.QuotePublicKey(false, "")
 		if err != nil {
 			return nil, fmt.Errorf("get quote public key error %s", err)
 		}
-		template, err = GenCSRTemplate(options, quote, quotePubKey, nonce, true)
+		template, err = GenCSRTemplate(options, quote, quotePubKey, true)
 		if err != nil {
 			return nil, fmt.Errorf("CSR template creation failed (%v)", err)
 		}
 	} else {
-		template, err = GenCSRTemplate(options, nil, nil, nil, false)
+		template, err = GenCSRTemplate(options, nil, nil, false)
 		if err != nil {
 			return nil, fmt.Errorf("CSR template creation failed (%v)", err)
 		}
@@ -500,8 +493,7 @@ func (gwC *GatewayCred) SetRootData(rootData []byte) {
 }
 
 // GenCSRTemplate generates a certificateRequest template with the given options.
-func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, nonce []byte,
-	needQuoteExtension bool) (*x509.CertificateRequest, error) {
+func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, needQuoteExtension bool) (*x509.CertificateRequest, error) {
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   "SGX based workload",
@@ -520,39 +512,10 @@ func GenCSRTemplate(options CertOptions, quote []byte, quotePubKey []byte, nonce
 
 	// Build sgx quote extension here
 	if needQuoteExtension {
-		decodeExtensionValue := func(value []byte) ([]byte, error) {
-			strValue := ""
-			if _, err := asn1.Unmarshal(value, &strValue); err != nil {
-				return nil, err
-			}
-			return base64.StdEncoding.DecodeString(strValue)
-		}
-		s, err := BuildQuoteExtension(quote)
-		if err != nil {
-			log.Warnf("Fail to BuildQuoteExtension (err: %s)", err)
-			return nil, err
-		}
-		if _, err := decodeExtensionValue(s.Value); err != nil {
-			log.Warnf("fail to decode Quote ExtensionValue")
-		}
+		s, _ := BuildQuoteExtension(quote)
 		template.ExtraExtensions = append(template.ExtraExtensions, *s)
-		p, err := BuildPubkeyExtension(quotePubKey)
-		if err != nil {
-			log.Warnf("Fail to BuildPubkeyExtension (err: %s)", err)
-		}
-		if _, err := decodeExtensionValue(p.Value); err != nil {
-			log.Warnf("Fail to decode Publickey ExtensionValue (err: %s)", err)
-		}
+		p, _ := BuildPubkeyExtension(quotePubKey)
 		template.ExtraExtensions = append(template.ExtraExtensions, *p)
-
-		n, err := BuildNonceExtension(nonce)
-		if err != nil {
-			log.Warnf("Fail to BuildQuoteNonceExtension (err: %s)", err)
-		}
-		if _, err := decodeExtensionValue(n.Value); err != nil {
-			log.Warnf("Fail to decode Quote Nonce ExtensionValue (err: %s)", err)
-		}
-		template.ExtraExtensions = append(template.ExtraExtensions, *n)
 	}
 
 	return template, nil

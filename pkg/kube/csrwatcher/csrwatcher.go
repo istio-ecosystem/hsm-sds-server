@@ -117,7 +117,7 @@ func newK8sCSR(name, signerName string, request []byte, usages []certv1.KeyUsage
 		usages = []certv1.KeyUsage{
 			certv1.UsageDigitalSignature,
 			certv1.UsageKeyEncipherment,
-			certv1.UsageServerAuth,
+			// certv1.UsageServerAuth,
 			certv1.UsageClientAuth,
 		}
 	}

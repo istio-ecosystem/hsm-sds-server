@@ -20,13 +20,12 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 		DelayQueue:    queue.NewDelayed(queue.DelayQueueBuffer(0)),
 		ConfigOptions: options,
 		SgxConfigs: &sgx.Config{
-			HSMTokenLabel:  sgx.HSMTokenLabel,
-			HSMUserPin:     sgx.HSMUserPin,
-			HSMSoPin:       sgx.HSMSoPin,
-			HSMConfigPath:  sgx.SgxLibrary,
-			HSMKeyLabel:    sgx.HSMKeyLabel,
-			HSMKeyType:     sgx.HSMKeyType,
-			UseRandonNonce: sgx.UseRandonNonce,
+			HSMTokenLabel: sgx.HSMTokenLabel,
+			HSMUserPin:    sgx.HSMUserPin,
+			HSMSoPin:      sgx.HSMSoPin,
+			HSMConfigPath: sgx.SgxLibrary,
+			HSMKeyLabel:   sgx.HSMKeyLabel,
+			HSMKeyType:    sgx.HSMKeyType,
 		},
 		SgxctxLock: sync.Mutex{},
 		Stop:       make(chan struct{}),
@@ -53,7 +52,7 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 	}
 	st.SgxctxLock.Unlock()
 
-	csrPem, err := st.GenerateCSR(*options, security.NeedQuoteExtension)
+	csrPem, err := st.GenerateCSR(*options, true)
 	if err != nil {
 		log.Info("failed to generate Kubernetes CSR: ", err)
 		return nil, err

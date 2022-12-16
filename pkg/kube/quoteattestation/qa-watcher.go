@@ -1,14 +1,14 @@
 package quoteattestation
 
 import (
-	"context"
 	"encoding/base64"
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -20,6 +20,7 @@ import (
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
 
+	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 )
 
@@ -43,6 +44,10 @@ type QuoteAttestationWatcher struct {
 	kubeClient kubernetes.Interface
 }
 
+var (
+	PodName = env.RegisterStringVar("POD_NAME", "istio-ingressgateway", "Name of istio ingressgateway pod").Get()
+)
+
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
 	log.Info("Start to run QuoteAttestationWatcher")
@@ -50,7 +55,7 @@ func (qa *QuoteAttestationWatcher) Run(stopCh chan struct{}) {
 	go qa.qaInformer.Run(stopCh)
 	// wait for the initial synchronization of the local cache.
 	if !cache.WaitForCacheSync(stopCh, qa.qaInformer.HasSynced) {
-		log.Error("failed to wait for cache sync")
+		 log.Error("failed to wait for cache sync")
 	}
 	go qa.queue.Run(stopCh)
 }
@@ -129,7 +134,7 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
-		instanceName := quoteAttestationPrefix + security.PodName + "-" + signer
+		instanceName := quoteAttestationPrefix + PodName + "-" + signer
 		ctx := context.Background()
 		err = qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		if err != nil {
@@ -214,7 +219,7 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	return nil
 }
 
-// NewQuoteAttestationWatcher creates a QuoteAttestationWatcher instance
+// NewQuoteAttestationWatcher creates a QuoteAttestationWatcher instance 
 func NewQuoteAttestationWatcher(client kube.Client, sm *security.SecretManager) (*QuoteAttestationWatcher, error) {
 	log.Info("New QuoteAttestationWatcher in SDS server")
 	qaInf := client.QaAPIInformer().Tcs().V1alpha1().QuoteAttestations().Informer()
@@ -242,7 +247,7 @@ func NewQuoteAttestationWatcher(client kube.Client, sm *security.SecretManager) 
 
 	qa.qaInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj any) { qa.onQuoteAttestationAdd(obj) },
+			AddFunc: func(obj any) { qa.onQuoteAttestationAdd(obj) },
 			UpdateFunc: func(oldObj any, newObj any) { qa.onQuoteAttestationUpdate(newObj) },
 		},
 	)

@@ -2,38 +2,17 @@
 
 # Build Istio
 HUB='istio' TAG='sds' DOCKER_TARGETS='docker.pilot docker.proxyv2' make docker
-
-docker save -o ${BINARY}.tar ${HUB}/${BINARY}:${TAG}
-	ctr -n k8s.io image import ${BINARY}.tar
 # Build sds server
 make docker
-
-# Refer to https://github.com/intel/trusted-certificate-issuer/blob/main/docs/istio-custom-ca-with-csr.md
-# Install TCS Signer
-export CA_SIGNER_NAME=sgx-signer
-cat << EOF | kubectl create -f -
-apiVersion: tcs.intel.com/v1alpha1
-kind: TCSClusterIssuer
-metadata:
-    name: $CA_SIGNER_NAME
-spec:
-    secretName: ${CA_SIGNER_NAME}-secret
-    # If using quoteattestaion, set selfSign as false
-    # selfSign: false
-EOF
-
-# Get CA Cert and replace it in deployment/istio-configs/istio-hsm-config.yaml
-kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tls\.crt}' |base64 -d | sed -e 's;\(.*\);        \1;g'
 
 # Install
 istioctl install -f deployment/istio-configs/istio-hsm-config.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
 
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-hsm.yaml )
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml )
-
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-gateway.yaml )
 
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml )
 
 # dump config
 ps -ef | grep envoy

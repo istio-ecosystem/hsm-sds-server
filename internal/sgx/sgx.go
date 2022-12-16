@@ -26,8 +26,9 @@ CK_ULONG quote_offset(CK_BYTE_PTR bytes) {
 	return offset;
 }
 
-CK_ULONG rsa_key_params_size() {
-    return (CK_ULONG)sizeof(CK_RSA_PUBLIC_KEY_PARAMS);
+CK_ULONG params_size(CK_BYTE_PTR bytes) {
+    CK_ULONG offset = sizeof(CK_RSA_PUBLIC_KEY_PARAMS);
+	return offset;
 }
 
 CK_ULONG ulModulusLen_offset(CK_BYTE_PTR bytes) {
@@ -44,7 +45,8 @@ CK_ULONG ulExponentLen_offset(CK_BYTE_PTR bytes) {
 	if (params == NULL) {
 		return 0;
 	}
-	return params->ulExponentLen;
+	CK_ULONG offset = params->ulExponentLen;
+	return offset;
 }
 
 */
@@ -107,11 +109,10 @@ const (
 )
 
 var (
-	HSMTokenLabel  = env.RegisterStringVar("TokenLabel", DefaultTokenLabel, "PKCS11 label to use for the token.").Get()
-	HSMUserPin     = env.RegisterStringVar("UserPin", DefaultHSMUserPin, "PKCS11 token user pin.").Get()
-	HSMSoPin       = env.RegisterStringVar("Sopin", DefaultHSMSoPin, "PKCS11 token so/admin pin.").Get()
-	HSMKeyType     = env.RegisterStringVar("KeyType", DefaultHSMKeyType, "PKCS11 key type.").Get()
-	UseRandonNonce = env.RegisterBoolVar("RANDOM_NONCE", true, "Use random nonce for SGX quote generation. Needed for KMRA version >= v2.2.").Get()
+	HSMTokenLabel = env.RegisterStringVar("TokenLabel", DefaultTokenLabel, "PKCS11 label to use for the token.").Get()
+	HSMUserPin    = env.RegisterStringVar("UserPin", DefaultHSMUserPin, "PKCS11 token user pin.").Get()
+	HSMSoPin      = env.RegisterStringVar("Sopin", DefaultHSMSoPin, "PKCS11 token so/admin pin.").Get()
+	HSMKeyType    = env.RegisterStringVar("KeyType", DefaultHSMKeyType, "PKCS11 key type.").Get()
 )
 
 type SgxContext struct {
@@ -126,10 +127,6 @@ type SgxContext struct {
 	quotePubKey pkcs11.ObjectHandle
 	// generated quote
 	ctkQuote []byte
-	// quote public key used for quote attestation
-	ctxQuoteAttestPubKey []byte
-	// quote nonce
-	ctxQuoteNonce []byte
 	// map for Gateway quote and key pair
 	gwQuoteAndKeyPair map[string]*GatewayQuoteAndKeyPair
 
@@ -146,13 +143,12 @@ type SgxContext struct {
 }
 
 type Config struct {
-	HSMTokenLabel  string
-	HSMUserPin     string
-	HSMSoPin       string
-	HSMKeyLabel    string
-	HSMKeyType     string
-	HSMConfigPath  string
-	UseRandonNonce bool
+	HSMTokenLabel string
+	HSMUserPin    string
+	HSMSoPin      string
+	HSMKeyLabel   string
+	HSMKeyType    string
+	HSMConfigPath string
 }
 
 type GatewayQuoteAndKeyPair struct {
@@ -162,8 +158,6 @@ type GatewayQuoteAndKeyPair struct {
 	GWQuotePubKey pkcs11.ObjectHandle
 	// generated quote for gateway
 	GWCTKQuote []byte
-	// quote nonce for gateway
-	GWCTKQuoteNonce []byte
 }
 
 func (cfg *Config) Validate() error {
@@ -228,64 +222,56 @@ func (ctx *SgxContext) Destroy() {
 	ctx.destroyCryptoContext()
 }
 
-func (ctx *SgxContext) QuoteandNonce(isGW bool, credName string) ([]byte, []byte, error) {
-	var quote, nonce []byte
+func (ctx *SgxContext) Quote(isGW bool, credName string) ([]byte, error) {
+	var quote []byte
 	if isGW {
 		gwRes := ctx.gwQuoteAndKeyPair[credName]
 		quote = gwRes.GWCTKQuote
-		nonce = gwRes.GWCTKQuoteNonce
 	} else {
 		quote = ctx.ctkQuote
-		nonce = ctx.ctxQuoteNonce
 	}
-	if quote == nil {
-		return nil, nil, fmt.Errorf("empty quote")
-	} else if nonce == nil {
-		return nil, nil, fmt.Errorf("empty nonce")
+	if quote == nil  {
+		return nil, fmt.Errorf("empty quote")
 	}
 	strQuote := base64.StdEncoding.EncodeToString(quote)
-	strNonce := base64.StdEncoding.EncodeToString(nonce)
-	return []byte(strQuote), []byte(strNonce), nil
+	return []byte(strQuote), nil
 }
 
 // QuotePublicKey returns the base64 encoded key
 // used for quote generation
 func (ctx *SgxContext) QuotePublicKey(isGW bool, credName string) ([]byte, error) {
-	ctx.cryptoCtxLock.Lock()
-	defer ctx.cryptoCtxLock.Unlock()
+	// ctx.p11CtxLock.Lock()
+	// defer ctx.p11CtxLock.Unlock()
 
 	var quotePubKey pkcs11.ObjectHandle
-	if !isGW {
-		pubkeybyte := ctx.ctxQuoteAttestPubKey
-		strPubKey := base64.StdEncoding.EncodeToString(pubkeybyte)
-		return []byte(strPubKey), nil
-	} else {
+	if isGW {
 		gwRes := ctx.gwQuoteAndKeyPair[credName]
 		quotePubKey = gwRes.GWQuotePubKey
-		template := []*pkcs11.Attribute{
-			pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
-			pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),
-		}
-		attrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, quotePubKey, template)
-		if err != nil {
-			return nil, err
-		}
-		var modulus = new(big.Int)
-		modulus.SetBytes(attrs[0].Value)
-		var bigExponent = new(big.Int)
-		bigExponent.SetBytes(attrs[1].Value)
-		if bigExponent.BitLen() > 32 || bigExponent.Sign() < 1 {
-			return nil, fmt.Errorf("malformed quote public key")
-		}
-		exponent := int(bigExponent.Uint64())
-		key := rsa.PublicKey{
-			N: modulus,
-			E: exponent,
-		}
-
-		return EncodePublicKey(&key)
+	} else {
+		quotePubKey = ctx.quotePubKey
+	}
+	template := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_MODULUS, nil),
+		pkcs11.NewAttribute(pkcs11.CKA_PUBLIC_EXPONENT, nil),
+	}
+	attrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, quotePubKey, template)
+	if err != nil {
+		return nil, err
+	}
+	var modulus = new(big.Int)
+	modulus.SetBytes(attrs[0].Value)
+	var bigExponent = new(big.Int)
+	bigExponent.SetBytes(attrs[1].Value)
+	if bigExponent.BitLen() > 32 || bigExponent.Sign() < 1 {
+		return nil, fmt.Errorf("malformed quote public key")
+	}
+	exponent := int(bigExponent.Uint64())
+	key := rsa.PublicKey{
+		N: modulus,
+		E: exponent,
 	}
 
+	return EncodePublicKey(&key)
 }
 
 func (ctx *SgxContext) TokenLabel() (string, error) {
@@ -579,111 +565,49 @@ func (ctx *SgxContext) GenerateQuoteAndPublicKey(isGW bool, credName string) err
 		return fmt.Errorf("call to generateP11KeyPair failed %s", err)
 	}
 
-	quote, pubkeybyte, nonce, err := ctx.generateQuote(pub)
+	quote, err := generateQuote(ctx.p11Ctx, ctx.p11Session, pub)
 	if err != nil {
 		ctx.p11Ctx.Destroy()
 		return fmt.Errorf("call to generateQuote failed %s", err)
 	}
-	if _, err := ParseQuotePublickey(pubkeybyte); err != nil {
-		log.Warnf("Fail ParseQuotePublickey: ", err)
-	}
 
 	if isGW {
 		var gwQuoteAndKeyPair = &GatewayQuoteAndKeyPair{
-			GWQuotePubKey:   pub,
-			GWQuotePrvKey:   priv,
-			GWCTKQuote:      quote,
-			GWCTKQuoteNonce: nonce,
+			GWQuotePubKey: pub,
+			GWQuotePrvKey: priv,
+			GWCTKQuote:    quote,
 		}
 		ctx.gwQuoteAndKeyPair[credName] = gwQuoteAndKeyPair
 	} else {
 		ctx.quotePubKey = pub
 		ctx.quotePrvKey = priv
 		ctx.ctkQuote = quote
-		ctx.ctxQuoteAttestPubKey = pubkeybyte
-		ctx.ctxQuoteNonce = nonce
 	}
 
 	return nil
 }
 
-func (ctx *SgxContext) generateQuote(pubKey pkcs11.ObjectHandle) ([]byte, []byte, []byte, error) {
-	ctx.cryptoCtxLock.Lock()
-	defer ctx.cryptoCtxLock.Unlock()
+func generateQuote(p11Ctx *pkcs11.Ctx, p11Session pkcs11.SessionHandle, pubKey pkcs11.ObjectHandle) ([]byte, error) {
+	// Wrap the key
 	quoteParams := C.CK_ECDSA_QUOTE_RSA_PUBLIC_KEY_PARAMS{
 		qlPolicy: C.SGX_QL_PERSISTENT,
 	}
-	if ctx.cfg.UseRandonNonce {
-		// KMRA 2.2+ expects nonce in the below format:
-		// --------------------------------------
-		// | 28 random bytes | 4 byte timestamp |
-		// --------------------------------------
-		reader, err := ctx.cryptoCtx.NewRandomReader()
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize random reader: %v", err)
-		}
-		randBytes, err := generateKeyID(reader, C.NONCE_LENGTH-4)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		now := uint32(time.Now().Unix())
-		timestamp := (*[4]byte)(unsafe.Pointer(&now))[:]
-		timenonce := append(randBytes, timestamp...)
-		for i := 0; i < C.NONCE_LENGTH; i++ {
-			quoteParams.nonce[i] = C.CK_BYTE(timenonce[i])
-		}
-	} else {
-		for i := 0; i < C.NONCE_LENGTH; i++ {
-			quoteParams.nonce[i] = C.CK_BYTE(i)
-		}
+	for i := 0; i < C.NONCE_LENGTH; i++ {
+		quoteParams.nonce[i] = C.CK_BYTE(i)
 	}
 
-	nonce := C.GoBytes(unsafe.Pointer(&quoteParams.nonce[0]), C.NONCE_LENGTH)
 	params := C.GoBytes(unsafe.Pointer(&quoteParams), C.int(unsafe.Sizeof(quoteParams)))
 	m := pkcs11.NewMechanism(C.CKM_EXPORT_ECDSA_QUOTE_RSA_PUBLIC_KEY, params)
 
-	quotePubKey, err := ctx.p11Ctx.WrapKey(ctx.p11Session, []*pkcs11.Mechanism{m}, pkcs11.ObjectHandle(0), pubKey)
+	//	l.V(3).Info("Wrapping key....")
+	quotePubKey, err := p11Ctx.WrapKey(p11Session, []*pkcs11.Mechanism{m}, pkcs11.ObjectHandle(0), pubKey)
 	if err != nil {
 		log.Warnf(err)
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	offset := uint64(C.quote_offset(*(*C.CK_BYTE_PTR)(unsafe.Pointer(&quotePubKey))))
-	if offset <= 0 || offset >= uint64(len(quotePubKey)) {
-		return nil, nil, nil, fmt.Errorf("quote generation failure: invalid quote")
-	}
-
-	return quotePubKey[offset:], quotePubKey[:offset], nonce, nil
-}
-
-// ParseQuotePublickey reconstruct the rsa public key
-// from received bytes, received bytes structure like this:
-// pubkey_params   |    ulExponentLen   |    ulModulusLen
-// need to slice ulExponentLen and ulModulusLen to
-// reconstruct pubkey according to the size of each item
-func ParseQuotePublickey(pubkey []byte) (*rsa.PublicKey, error) {
-	paramsSize := uint64(C.rsa_key_params_size())
-	exponentLen := uint64(C.ulExponentLen_offset(*(*C.CK_BYTE_PTR)(unsafe.Pointer(&pubkey))))
-	modulusOffset := paramsSize + exponentLen
-	if modulusOffset >= uint64(len(pubkey)) {
-		return nil, fmt.Errorf("malformed quote public key: out of bounds")
-	}
-
-	var bigExponent = new(big.Int)
-	bigExponent.SetBytes(pubkey[paramsSize:modulusOffset])
-	if bigExponent.BitLen() > 32 || bigExponent.Sign() < 1 {
-		return nil, fmt.Errorf("malformed quote public key")
-	}
-	if bigExponent.Uint64() > uint64(math.MaxInt) {
-		return nil, fmt.Errorf("malformed quote public key: possible data loss in exponent value")
-	}
-	exponent := int(bigExponent.Uint64())
-	var modulus = new(big.Int)
-	modulus.SetBytes(pubkey[modulusOffset:])
-	return &rsa.PublicKey{
-		N: modulus,
-		E: exponent,
-	}, nil
+	offset := int(C.quote_offset(*(*C.CK_BYTE_PTR)(unsafe.Pointer(&quotePubKey))))
+	return quotePubKey[offset:], nil
 }
 
 func (ctx *SgxContext) GetSignerForName(name string) (crypto11.Signer, error) {
