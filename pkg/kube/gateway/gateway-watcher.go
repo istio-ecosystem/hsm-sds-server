@@ -139,11 +139,18 @@ func (gw *GatewayWatcher) onGatewayDelete(obj any) {
 		return
 	}
 
+	credSMap := gw.gwSM.GetCredMap()
 	// fetch the credential name for gateway CR
 	gatewaySelector := labels.Instance(gwSeletor)
 	if gatewaySelector.SubsetOf(gw.gwPodLabel) {
 		gwServers := gwAPICR.GetServers()
 		for _, gwServer := range gwServers {
+			port := gwServer.GetPort()
+			if cred, ok := credSMap[port]; ok {
+				close(cred.CertSync)
+				close(cred.RootSync)
+				delete(credSMap, port)
+			}
 			if gwTLS := gwServer.GetTls(); gwTLS != nil {
 				credName := gwTLS.GetCredentialName()
 				if credName != "" && strings.HasPrefix(credName, security.SDSCredNamePrefix) {

@@ -154,6 +154,7 @@ func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSec
 			if err != nil {
 				if status.Code(err) == codes.Canceled || errors.Is(err, io.EOF) {
 					err = nil
+					continue
 				}
 				errch <- err
 				return
@@ -296,7 +297,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				log.Info("rootCA data arrive")
 				gwRootCA = myCred.GetRootData()
 				log.Info("root CA data: ", gwRootCA)
-				if gwRootCA == nil {
+				if len(gwRootCA) == 0 {
 					return nil, fmt.Errorf("no available rootCA for resource [%s]", resName)
 				}
 			}
@@ -333,7 +334,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 					},
 				},
 			}
-		} else if isGateway && strings.HasSuffix(resourceName, security.SDSCredNameSuffix) && gwRootCA != nil {
+		} else if isGateway && strings.HasSuffix(resourceName, security.SDSCredNameSuffix) && len(gwRootCA) > 0 {
 			secret.Type = &tlsv3.Secret_ValidationContext{
 				ValidationContext: &tlsv3.CertificateValidationContext{
 					TrustedCa: &corev3.DataSource{
@@ -531,6 +532,10 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 // shouldResponse determines if the sds server will build response,
 // Only the first request will build response, and ACK/NACK will not return response
 func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
+	if len(req.ResourceNames) == 0 {
+		log.Warnf("No resource name request, unnecessary to response")
+		return false
+	}
 	if req.GetResponseNonce() == "" {
 		log.Info("DEBUG Envoy Request nonce is none, need response")
 		return true

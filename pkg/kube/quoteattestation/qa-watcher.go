@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -137,8 +136,14 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		}
 		instanceName := quoteAttestationPrefix + PodName + "-" + signer
 		ctx := context.Background()
-		qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
-		qa.kubeClient.CoreV1().Secrets(req.Namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+		err = qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
+		if err != nil {
+			log.Error(err, "failed to delete the quoteattestation cr ", instanceName)
+		}
+		err = qa.kubeClient.CoreV1().Secrets(req.Namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+		if err != nil {
+			log.Error(err, "failed to delete the secret ", secretName)
+		}
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
 		statusErr = multierror.Append(statusErr, err)
@@ -188,34 +193,25 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 		credName := cred.GetSGXKeyLable()
 		log.Info("CredName: ", credName)
 		if credName == signerName {
-			var wg sync.WaitGroup
-			if certData != nil {
+			if len(certData) > 0 {
 				log.Info("certData is not empty")
-				wg.Add(1)
+				log.Info(certData)
 				cred.SetCertData(certData)
 			}
-			if rootCAData != nil {
+			if len(rootCAData) > 0 {
 				log.Info("rootCAData is not empty")
-				wg.Add(1)
+				log.Info(rootCAData)
 				cred.SetRootData(rootCAData)
 			}
 			qa.qaSM.SetCredMap(port, cred)
 
-			go func() {
-				defer wg.Done()
-				if certData != nil {
-					cred.CertSync <- struct{}{}
-				}
-			}()
+			if len(certData) > 0 {
+				cred.CertSync <- struct{}{}
+			}
 
-			go func() {
-				defer wg.Done()
-				if rootCAData != nil {
-					cred.RootSync <- struct{}{}
-				}
-			}()
-
-			wg.Wait()
+			if len(rootCAData) > 0 {
+				cred.RootSync <- struct{}{}
+			}
 			break
 		}
 	}
