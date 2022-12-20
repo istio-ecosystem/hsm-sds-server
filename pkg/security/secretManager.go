@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	istioapi "istio.io/api/networking/v1alpha3"
 	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 
@@ -69,7 +68,7 @@ type SecretCache struct {
 	workload *SecretItem
 	rootCert []byte
 	csrBytes []byte
-	credMap  map[*istioapi.Port]*GatewayCred
+	credMap  map[string]*GatewayCred
 }
 
 type SecretItem struct {
@@ -418,48 +417,57 @@ func (s *SecretCache) GetcsrBytes() (csrBytes []byte) {
 	return s.csrBytes
 }
 
-func (sc *SecretManager) GetCredMap() map[*istioapi.Port]*GatewayCred {
+func (sc *SecretManager) GetCredMap() map[string]*GatewayCred {
 	if sc.Cache.credMap == nil {
-		sc.Cache.credMap = make(map[*istioapi.Port]*GatewayCred)
+		sc.Cache.credMap = make(map[string]*GatewayCred)
 	}
 	return sc.Cache.credMap
 }
 
-func (sc *SecretManager) GetCredWithPort(port *istioapi.Port) *GatewayCred {
-	if sc.Cache.credMap != nil {
-		return sc.Cache.credMap[port]
+func (sc *SecretManager) SetCredMap(key string, cred *GatewayCred) {
+	sc.Cache.mu.RLock()
+	defer sc.Cache.mu.RUnlock()
+	if sc.Cache.credMap == nil {
+		sc.Cache.credMap = make(map[string]*GatewayCred)
 	}
-	return nil
+	sc.Cache.credMap[key] = cred
 }
 
-func (sc *SecretManager) GetLableKeyWithPortForGateway(port *istioapi.Port) string {
+func (sc *SecretManager) DeleteCredWithKey(key string) bool {
+	log.Info("Delete credSMap with key %v", key)
+	credMap := sc.Cache.credMap
+	log.Info("CredMap: ", credMap)
+	if credMap != nil {
+		return false
+	}
+	if cred, ok := credMap[key]; ok {
+		close(cred.CertSync)
+		close(cred.RootSync)
+		delete(credMap, key)
+		return true
+	}
+	return false
+}
+
+func (sc *SecretManager) GetLableKeyWithKeyForGateway(key string) string {
 	if sc.Cache.credMap != nil {
-		return sc.Cache.credMap[port].sgxKeyLable
+		return sc.Cache.credMap[key].sgxKeyLable
 	}
 	return ""
 }
 
-func (sc *SecretManager) GetCertWithPortForGateway(port *istioapi.Port) []byte {
+func (sc *SecretManager) GetCertWithKeyForGateway(key string) []byte {
 	if sc.Cache.credMap != nil {
-		return sc.Cache.credMap[port].certData
+		return sc.Cache.credMap[key].certData
 	}
 	return nil
 }
 
-func (sc *SecretManager) GetCAWithPortForGateway(port *istioapi.Port) []byte {
+func (sc *SecretManager) GetCAWithKeyForGateway(key string) []byte {
 	if sc.Cache.credMap != nil {
-		return sc.Cache.credMap[port].rootData
+		return sc.Cache.credMap[key].rootData
 	}
 	return nil
-}
-
-func (sc *SecretManager) SetCredMap(port *istioapi.Port, cred *GatewayCred) {
-	sc.Cache.mu.RLock()
-	defer sc.Cache.mu.RUnlock()
-	if sc.Cache.credMap == nil {
-		sc.Cache.credMap = make(map[*istioapi.Port]*GatewayCred)
-	}
-	sc.Cache.credMap[port] = cred
 }
 
 func (sc *SecretManager) RegisterSecretHandler(h func(resourceName string)) {

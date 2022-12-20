@@ -189,7 +189,7 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 
 	log.Info("Begin to add certificate/rootCA data to credMap")
 	credMap := qa.qaSM.GetCredMap()
-	for port, cred := range credMap {
+	for credKey, cred := range credMap {
 		credName := cred.GetSGXKeyLable()
 		log.Info("CredName: ", credName)
 		if credName == signerName {
@@ -203,7 +203,7 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 				log.Info(rootCAData)
 				cred.SetRootData(rootCAData)
 			}
-			qa.qaSM.SetCredMap(port, cred)
+			qa.qaSM.SetCredMap(credKey, cred)
 
 			if len(certData) > 0 {
 				cred.CertSync <- struct{}{}

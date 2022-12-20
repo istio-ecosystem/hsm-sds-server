@@ -266,11 +266,13 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			credMap := s.st.GetCredMap()
 			log.Info("Cred Map lenght: ", len(credMap))
 			resName := resourceName
-			for port, cred := range credMap {
-				lableKey := s.st.GetLableKeyWithPortForGateway(port)
+			for credKey, cred := range credMap {
+				lableKey := s.st.GetLableKeyWithKeyForGateway(credKey)
 				sdsPrefixLableKey := security.HandleCredNameForEnvoy(resourceName)
 				sdsSuffixLableKey := strings.TrimSuffix(sdsPrefixLableKey, security.SDSCredNameSuffix)
 				log.Info("lableKey: ", lableKey)
+				log.Info("sdsPrefixLableKey: ", sdsPrefixLableKey)
+				log.Info("sdsSuffixLableKey: ", sdsSuffixLableKey)
 				if lableKey == sdsPrefixLableKey || lableKey == sdsSuffixLableKey {
 					myCred = cred
 					resName = lableKey
