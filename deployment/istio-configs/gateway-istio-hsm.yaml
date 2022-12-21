@@ -209,15 +209,15 @@ spec:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
             - name: NEED_QUOTE
-                value: "false"
+              value: "false"
             - name: RANDOM_NONCE
-                value: "true"
+              value: "true"
             - name: CERT_SIGNER_DOMAIN
-                value: tcsclusterissuer.tcs.intel.com
+              value: tcsclusterissuer.tcs.intel.com
             - name: EXTERNAL_CA
-                value: ISTIOD_RA_KUBERNETES_API
+              value: ISTIOD_RA_KUBERNETES_API
             - name: PILOT_CERT_PROVIDER
-                value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
+              value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
             volumeMounts:
             - name: workload-socket
               mountPath: /var/run/secrets/workload-spiffe-uds
