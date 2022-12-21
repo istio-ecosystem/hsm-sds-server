@@ -47,8 +47,9 @@ var (
 	// The OID for the SAN extension (See
 	// http://www.alvestrand.no/objectid/2.5.29.17.html).
 	oidSubjectAlternativeName     = asn1.ObjectIdentifier{2, 5, 29, 17}
-	oidSubjectQuoteExtensionName  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1283}
-	oidSubjectPubkeyExtensionName = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1284}
+	OidSubjectQuoteExtensionName  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1283}
+	OidSubjectPubkeyExtensionName = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1284}
+	OidSubjectNonceExtensionName  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54392, 5, 1547}
 )
 
 // Identity is an object holding both the encoded identifier bytes as well as
@@ -189,36 +190,50 @@ func generateReversedMap(m map[IdentityType]int) map[int]IdentityType {
 
 // BuildQuoteExtension builds the SGX Quote extension for the certificate.
 func BuildQuoteExtension(Quote []byte) (*pkix.Extension, error) {
-	val := []asn1.RawValue{}
 
-	val = append(val, asn1.RawValue{
+	val := &asn1.RawValue{
 		Bytes: Quote,
 		Class: asn1.ClassUniversal,
 		Tag:   asn1.TagUTF8String,
-	})
+	}
 
-	bs, err := asn1.Marshal(val)
+	bs, err := asn1.Marshal(*val)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the raw values for SGX field (err: %s)", err)
 	}
 
-	return &pkix.Extension{Id: oidSubjectQuoteExtensionName, Critical: false, Value: bs}, nil
+	return &pkix.Extension{Id: OidSubjectQuoteExtensionName, Critical: false, Value: bs}, nil
 }
 
 // BuildPubkeyExtension builds the SGX Quote Publickey extension for the certificate.
 func BuildPubkeyExtension(QuotePubKey []byte) (*pkix.Extension, error) {
-	val := []asn1.RawValue{}
-
-	val = append(val, asn1.RawValue{
+	val := &asn1.RawValue{
 		Bytes: QuotePubKey,
 		Class: asn1.ClassUniversal,
 		Tag:   asn1.TagUTF8String,
-	})
+	}
 
-	bs, err := asn1.Marshal(val)
+	bs, err := asn1.Marshal(*val)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the raw values for SGX field (err: %s)", err)
 	}
 
-	return &pkix.Extension{Id: oidSubjectPubkeyExtensionName, Critical: false, Value: bs}, nil
+	return &pkix.Extension{Id: OidSubjectPubkeyExtensionName, Critical: false, Value: bs}, nil
+}
+
+// BuildNonceExtension builds the SGX Quote Nonce extension for the certificate.
+func BuildNonceExtension(QuoteNonce []byte) (*pkix.Extension, error) {
+
+	val := &asn1.RawValue{
+		Bytes: QuoteNonce,
+		Class: asn1.ClassUniversal,
+		Tag:   asn1.TagUTF8String,
+	}
+
+	bs, err := asn1.Marshal(*val)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal the raw values for SGX field (err: %s)", err)
+	}
+
+	return &pkix.Extension{Id: OidSubjectNonceExtensionName, Critical: false, Value: bs}, nil
 }

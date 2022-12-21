@@ -17,12 +17,13 @@ rules:
 - apiGroups: ["networking.istio.io"]
   resources: ["gateways"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["tcs.intel.com"]
-  resources: ["quoteattestations"]
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests", "certificatesigningrequests/approval", "certificatesigningrequests/status"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["certificates.k8s.io"]
-  resources: ["certificatesigningrequests", "certificatesigningrequests/approval"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "approval"]
+  resourceNames: [tcsclusterissuer.tcs.intel.com/*]
+  resources: ["signers"]
+  verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

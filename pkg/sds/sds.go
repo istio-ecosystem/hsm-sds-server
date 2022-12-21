@@ -3,7 +3,6 @@ package sds
 import (
 	"context"
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -83,7 +82,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		NotBefore:                      time.Now(),
 		RSAKeySize:                     security.DefaultRSAKeysize,
 		Org:                            "Intel(R) Corporation",
-		SecretRotationGracePeriodRatio: 0.5,
+		SecretRotationGracePeriodRatio: security.SecretRotationGracePeriodRatioEnv,
 	}
 	st, err := util.NewSecretManager(&options)
 	if st != nil && err == nil {
@@ -128,13 +127,13 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		}
 		log.Infof("Get the CA certificate: %v", caCert)
 
-		csrWatcher, err := csrwatcher.NewK8sCSRWatcher(sdsSvc.sdsClient, sdsSvc.st)
-		if err != nil {
-			log.Errorf("error in NewK8sCSRWatcher: %v", err)
-		}
-		sdsSvc.csrWatcher = csrWatcher
-		log.Info("start csrWatcher to watch the Kubernetes CSR object of SDS service")
-		go sdsSvc.csrWatcher.Run(sdsSvc.stop)
+		// csrWatcher, err := csrwatcher.NewK8sCSRWatcher(sdsSvc.sdsClient, sdsSvc.st)
+		// if err != nil {
+		// 	log.Errorf("error in NewK8sCSRWatcher: %v", err)
+		// }
+		// sdsSvc.csrWatcher = csrWatcher
+		// log.Info("start csrWatcher to watch the Kubernetes CSR object of SDS service")
+		// go sdsSvc.csrWatcher.Run(sdsSvc.stop)
 	}
 
 	return sdsSvc
@@ -280,13 +279,13 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				}
 			}
 			if myCred == nil {
-				myCred = &security.GatewayCred {}
+				myCred = &security.GatewayCred{}
 				myCred.SetSGXKeyLable(resName)
 			}
 
 			if !strings.HasSuffix(resourceName, security.SDSCredNameSuffix) {
 				log.Info("wait for certificate data")
-				<- myCred.CertSync
+				<-myCred.CertSync
 				log.Info("certificate data arrive")
 				cert = myCred.GetCertData()
 				log.Info("certificate data: ", cert)
@@ -295,7 +294,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				}
 			} else {
 				log.Info("wait for rootCA data")
-				<- myCred.RootSync
+				<-myCred.RootSync
 				log.Info("rootCA data arrive")
 				gwRootCA = myCred.GetRootData()
 				log.Info("root CA data: ", gwRootCA)
@@ -453,32 +452,41 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 			return nil, fmt.Errorf("%v cert not found", resourceName)
 		}
 	} else {
-		csrBytes, err := s.st.GenerateCSR(*s.st.ConfigOptions, true)
+		csrBytes, err := s.st.GenerateCSR(*s.st.ConfigOptions, security.NeedQuoteExtension)
 		if err != nil {
 			return nil, fmt.Errorf("failed generate kubernetes CSR %v", err)
 		}
 		// SetcsrBytes and wait for third part CA signed certificate
 		s.st.Cache.SetcsrBytes(csrBytes)
-		_, err = s.CreateK8sCSR(csrBytes, resourceName)
+		s.st.SgxctxLock.Lock()
+		cert, err = s.SignCSRK8s(csrBytes, resourceName)
+		if cert == nil {
+			log.Warnf("Can't read signed certificate")
+		}
+		s.st.SgxctxLock.Unlock()
 		if err != nil {
-			return nil, err
+			log.Warnf("Can't get certificate: ", err)
+		}
+		if cert != nil {
+			log.Infof("workload certificate generated successfully.")
+			return cert, nil
 		}
 
 		// Else self-sign a cert
-		signerCert, err := security.ParsePemEncodedCertificate(s.st.Cache.GetRoot())
-		if err != nil {
-			return nil, fmt.Errorf("failed get signer cert from cache %v", err)
-		}
-		if signerCert != nil {
-			s.st.ConfigOptions.SignerCert = signerCert
-		}
-		s.st.SgxctxLock.Lock()
-		cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageKeyEncipherment|x509.KeyUsageKeyAgreement|x509.KeyUsageDigitalSignature,
-			[]x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth})
-		if err != nil {
-			return nil, fmt.Errorf("failed Create New Certificate: %v", err)
-		}
-		s.st.SgxctxLock.Unlock()
+		// signerCert, err := security.ParsePemEncodedCertificate(s.st.Cache.GetRoot())
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed get signer cert from cache %v", err)
+		// }
+		// if signerCert != nil {
+		// 	s.st.ConfigOptions.SignerCert = signerCert
+		// }
+		// s.st.SgxctxLock.Lock()
+		// cert, err = s.st.CreateNewCertificate(csrBytes, s.st.ConfigOptions.SignerCert, time.Hour*24, isCA, x509.KeyUsageKeyEncipherment|x509.KeyUsageKeyAgreement|x509.KeyUsageDigitalSignature,
+		// 	[]x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth})
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed Create New Certificate: %v", err)
+		// }
+		// s.st.SgxctxLock.Unlock()
 
 		// x509cert, _ := security.ParsePemEncodedCertificate(cert)
 		// secretItem := &security.SecretItem{
@@ -488,9 +496,9 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 		// 	CreatedTime:      x509cert.NotBefore,
 		// 	ExpireTime:       x509cert.NotAfter,
 		// }
-		log.Infof("workload certificate generated successfully.")
+		// log.Infof("workload certificate generated successfully.")
 		// s.st.Cache.SetWorkload(secretItem)
-		return cert, nil
+		// return cert, nil
 		// TODO: approve this csr manually
 		// patch := client.MergeFrom(k8scsr.DeepCopy())
 
@@ -528,7 +536,7 @@ func (s *sdsservice) GenCSRandGetCert(resourceName string) ([]byte, error) {
 
 	}
 	// log.Info("Can't get Certificate from CSR object")
-	// return nil, nil
+	return nil, nil
 }
 
 // shouldResponse determines if the sds server will build response,

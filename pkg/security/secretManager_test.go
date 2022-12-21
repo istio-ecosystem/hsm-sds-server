@@ -275,7 +275,7 @@ func TestGenCSRTemplate(t *testing.T) {
 			IsDualUse:  true,
 		}
 
-		csr, err := GenCSRTemplate(opts, nil, nil, false)
+		csr, err := GenCSRTemplate(opts, nil, nil, nil, false)
 		if err != nil {
 			t.Error(err)
 		}
