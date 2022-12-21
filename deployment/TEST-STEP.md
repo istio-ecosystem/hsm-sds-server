@@ -40,11 +40,11 @@ kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tl
 istioctl install -f deployment/istio-configs/istio-hsm-config.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
 istioctl install -f deployment/istio-configs/gateway-istio-hsm.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-hsm.yaml )
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-hsm.yaml)
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-gateway.yaml )
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-gateway.yaml)
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml )
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml)
 ```
 
 ## dump config
@@ -75,12 +75,6 @@ kubectl delete -f deployment/istio-configs/sleep-hsm.yaml
 kubectl delete -f deployment/istio-configs/httpbin-hsm.yaml
 
 kubectl delete -f deployment/istio-configs/sleep-gateway.yaml
-
-kubectl get po
-
-kubectl logs -l app=sleep -c testsds
-
-istioctl pc all sleep-854bcf566d-vd2cp.debugsds -o json > config_dump.json
 ```
 
 ## Binary test
@@ -112,9 +106,9 @@ cd applications.services.cloud.hsm-sds-server
 
 istioctl install -f deployment/istio-configs/gateway-istio-hsm.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml )
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml)
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-gateway.yaml )
+kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-gateway.yaml)
 ```
 
 ## Get the credential information
@@ -172,3 +166,13 @@ curl -v -HHost:httpbin.example.com --resolve "httpbin.example.com:$SECURE_INGRES
 ```
 It will be okay if got below response:
 [Response](./gateway-test.png)
+
+## Clean up
+
+```
+istioctl x uninstall --purge -y
+
+kubectl delete -f deployment/istio-configs/httpbin-gateway.yaml
+
+kubectl delete -f deployment/istio-configs/httpbin-hsm.yaml
+```
