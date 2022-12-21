@@ -38,6 +38,7 @@ kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tl
 
 ```
 istioctl install -f deployment/istio-configs/istio-hsm-config.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
+istioctl install -f deployment/istio-configs/gateway-istio-hsm.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
 
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-hsm.yaml )
 
@@ -144,7 +145,7 @@ openssl x509 -req -sha256 -days 365 -CA $CREDENTIAL/example.com.crt -CAkey $CRED
 {
     "keys": [
         {
-            "signer": "clusterissuers.tcs.intel.com/istio-system",
+            "signer": "tcsclusterissuer.tcs.intel.com/sgx-signer",
             "key_path": "$CREDENTIAL/httpbin.key",
             "cert": "$CREDENTIAL/httpbin.crt"
         }
@@ -154,7 +155,7 @@ openssl x509 -req -sha256 -days 365 -CA $CREDENTIAL/example.com.crt -CAkey $CRED
 
 ## Update credential quote attestation CR with secret contained wrapped key
 ```
-WRAPPED_KEY=$(km-wrap --signer clusterissuers.tcs.intel.com/istio-system --pubkey $CREDENTIAL/public.key --pin "HSMUserPin" --token "HSMSDSServer" --module /usr/local/lib/softhsm/libsofthsm2.so)
+WRAPPED_KEY=$(km-wrap --signer tcsclusterissuer.tcs.intel.com/sgx-signer --pubkey $CREDENTIAL/public.key --pin "HSMUserPin" --token "HSMSDSServer" --module /usr/local/lib/softhsm/libsofthsm2.so)
 kubectl create secret generic -n default wrapped-key --from-literal=tls.key=${WRAPPED_KEY} --from-literal=tls.crt=$(base64 -w 0 < $CREDENTIAL/httpbin.crt)
 ```
 kubectl edit quoteattestations.tcs.intel.com $QA_NAME -n default with `secretName: wrapped-key`

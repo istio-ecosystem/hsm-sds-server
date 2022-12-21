@@ -31,7 +31,7 @@ const (
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
-	PendingSelfSignerName      = "clusterissuers.tcs.intel.com/istio-system"
+	PendingSelfSignerName      = "tcsclusterissuer.tcs.intel.com/sgx-signer"
 	SDSCredNamePrefix          = "sds://"
 	SDSCredNameSuffix          = "-cacert"
 	// Max retry time to get signed certificate in kubernetes csr
