@@ -104,7 +104,7 @@ spec:
               - name: NEED_QUOTE
                 value: "false"
               - name: RANDOM_NONCE
-                value: "true"
+                value: "false"
               - name: POD_NAME
                 valueFrom:
                   fieldRef:
@@ -211,7 +211,7 @@ spec:
             - name: NEED_QUOTE
               value: "false"
             - name: RANDOM_NONCE
-              value: "true"
+              value: "false"
             - name: CERT_SIGNER_DOMAIN
               value: tcsclusterissuer.tcs.intel.com
             - name: EXTERNAL_CA
