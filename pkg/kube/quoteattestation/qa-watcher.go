@@ -24,9 +24,6 @@ import (
 )
 
 const (
-	// one quoteattestation custom resource(cr) will be generated for one Quote Attestation cr
-	// instance name is using quoteAttestationPrefix + corresponding Quote Attestation cr name + "- " + Quote Attestation cr namespace
-	quoteAttestationPrefix     = "sgxquoteattestation-"
 	DefaultQuoteVersion        = "ECDSA Quote 3"
 	KMRABased                  = "KMRA"
 	asRootCA                   = true
@@ -129,7 +126,7 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
-		instanceName := quoteAttestationPrefix + security.PodName + "-" + signer
+		instanceName := security.QuoteAttestationPrefix + security.PodName + "-" + signer
 		ctx := context.Background()
 		err = qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		if err != nil {

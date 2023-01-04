@@ -34,6 +34,9 @@ const (
 	PendingSelfSignerName      = "tcsclusterissuer.tcs.intel.com/sgx-signer"
 	SDSCredNamePrefix          = "sds://"
 	SDSCredNameSuffix          = "-cacert"
+	// one quoteattestation custom resource(cr) will be generated for one Quote Attestation cr
+	// instance name is using quoteAttestationPrefix + corresponding Quote Attestation cr name + "- " + Quote Attestation cr namespace
+	QuoteAttestationPrefix     = "sgxquoteattestation-"
 	// Max retry time to get signed certificate in kubernetes csr
 	CertWatchTimeout = 60 * time.Second
 	// The interval for reading a certificate

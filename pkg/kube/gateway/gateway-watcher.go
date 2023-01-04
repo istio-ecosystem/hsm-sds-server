@@ -9,6 +9,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
 	quoteapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
@@ -28,9 +29,6 @@ import (
 )
 
 const (
-	// one quoteattestation custom resource(cr) will be generated for one gateway cr
-	// instance name is using quoteAttestationPrefix + corresponding gateway cr name + "- " + gateway cr namespace
-	quoteAttestationPrefix = "sgxquoteattestation-"
 	DefaultQuoteVersion    = "ECDSA Quote 3"
 	KMRABased              = "KMRA"
 	asRootCA               = true
@@ -44,6 +42,7 @@ type GatewayWatcher struct {
 	gwPodLabel labels.Instance
 	gwSM       *security.SecretManager
 	tcsClient  v1alpha1.TcsV1alpha1Interface
+	kubeClient kubernetes.Interface
 }
 
 // Run starts shared informers and waits for the shared informer cache to synchronize
@@ -102,7 +101,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 	ctx := context.Background()
 	for _, credName := range credNames {
 		// create quoteAttestation CR for gateway CR
-		instanceName := quoteAttestationPrefix + security.PodName + "-" + credName
+		instanceName := security.QuoteAttestationPrefix + security.PodName + "-" + credName
 		if credName != "" {
 			if err := gw.QuoteAttestationDeliver(ctx, credName, instanceName, gatewayCR.Namespace); err != nil {
 				log.Errorf("failed to created or updated quoteAttestation CR %s", err)
@@ -145,8 +144,24 @@ func (gw *GatewayWatcher) onGatewayDelete(obj any) {
 					gw.gwSM.DeleteCredWithKey(gwServer.Port.String())
 					log.Infof("Gateway delete: credential Name of the gatway is [%s]", credName)
 					signerName := security.HandleCredNameForEnvoy(credName)
+					instanceName := security.QuoteAttestationPrefix + security.PodName + "-" + signerName
+					//may need to delete the quoteattestation or k8s secret
+					ctx := context.Background()
+					qaCR, err := gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Get(ctx, instanceName, metav1.GetOptions{})
+					if qaCR != nil {
+						secretName := qaCR.Spec.SecretName
+						err = gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
+						if err != nil {
+							log.Warn(err, "failed to delete the quoteattestation cr ", instanceName)
+						}
+						err = gw.kubeClient.CoreV1().Secrets(gatewayCR.Namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+						if err != nil {
+							log.Warn(err, "failed to delete the secret ", secretName)
+						}
+					}
+
 					//delete the given key from signer and SGX enclave
-					err := sgxctx.RemoveKeyForSigner(signerName)
+					err = sgxctx.RemoveKeyForSigner(signerName)
 					if err != nil {
 						log.Errorf("Remove Key %s for signer error: %v", signerName, err)
 					}
@@ -184,6 +199,7 @@ func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*Gateway
 		gwInformer: gwInf,
 		gwLister:   gatewaylister.NewGatewayLister(gwInf.GetIndexer()),
 		gwSM:       sm,
+		kubeClient: client.Kube(),
 	}
 
 	tcsClient, err := v1alpha1.NewForConfig(client.RESTConfig())
