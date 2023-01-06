@@ -71,7 +71,7 @@ spec:
         app: sleep
       # Injects custom sidecar template
       annotations:
-        inject.istio.io/templates: "sidecar,custom"
+        inject.istio.io/templates: "sidecar,sgx"
     spec:
       terminationGracePeriodSeconds: 0
       serviceAccountName: sleep

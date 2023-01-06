@@ -24,11 +24,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG DCAP_VERSION="1.14.100.3"
 # SGX prerequisites
 # hadolint ignore=DL3005,DL3008
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && apt-get update \
+RUN apt-get update \
   && apt-get install --no-install-recommends -y \
     ca-certificates \
     curl \
@@ -75,11 +71,7 @@ WORKDIR /opt/intel
 
 # Install SGX SDK
 # hadolint ignore=DL4006
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && wget https://download.01.org/intel-sgx/sgx-linux/2.17/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
+RUN wget https://download.01.org/intel-sgx/sgx-linux/2.17/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
   && chmod +x  $SGX_SDK_INSTALLER \
   && echo "yes" | ./$SGX_SDK_INSTALLER \
   && rm $SGX_SDK_INSTALLER \
@@ -90,11 +82,7 @@ ARG CTK_TAG="master"
 
 # Intel crypto-api-toolkit prerequisites
 #https://github.com/intel/crypto-api-toolkit#software-requirements
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && set -x && apt-get update \
+RUN set -x && apt-get update \
   && apt-get install --no-install-recommends -y \
     dkms libprotobuf17 autoconf \
     autotools-dev libc6-dev \
@@ -127,11 +115,7 @@ FROM ubuntu:focal as runtime
 ARG SDK_VERSION="2.17.100.3"
 ARG DCAP_VERSION="1.14.100.3"
 
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && apt-get update \
+RUN apt-get update \
   && apt-get install -y wget gnupg \
   && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main" >> /etc/apt/sources.list.d/intel-sgx.list \
   && wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - \
@@ -165,11 +149,7 @@ RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
 FROM ubuntu:focal as sources
 COPY --from=runtime /usr/local/share/package-install.log /usr/local/share/package-install.log
 COPY --from=runtime /usr/share/doc /tmp/runtime-doc
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
+RUN sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
      && apt-get update \
      && mkdir /usr/local/share/package-sources && cd /usr/local/share/package-sources \ 
      && apt-get install -y git \
@@ -213,11 +193,7 @@ ARG USERNAME=istio-proxy
 ARG USER_UID=1337
 ARG USER_GID=$USER_UID
 
-RUN export HTTP_PROXY=http://child-prc.intel.com:913 \
-  && export HTTPS_PROXY=http://child-prc.intel.com:913 \
-  && export http_proxy=http://child-prc.intel.com:913 \
-  && export https_proxy=http://child-prc.intel.com:913 \
-  && export DEBIAN_FRONTEND=noninteractive \
+RUN export DEBIAN_FRONTEND=noninteractive \
   && apt-get update && apt-get -y install opensc \ 
   && groupadd --gid $USER_GID $USERNAME \
   && useradd --create-home --home-dir /home/istio-proxy --uid $USER_UID --gid $USER_GID -m $USERNAME
