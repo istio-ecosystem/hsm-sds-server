@@ -71,7 +71,7 @@ spec:
         app: helloworld
         version: v1
       annotations:
-        inject.istio.io/templates: "sidecar,custom"
+        inject.istio.io/templates: "sidecar,sgx"
     spec:
       serviceAccountName: helloworld
       containers:
@@ -103,7 +103,7 @@ spec:
         app: helloworld
         version: v2
       annotations:
-        inject.istio.io/templates: "sidecar,custom"
+        inject.istio.io/templates: "sidecar,sgx"
     spec:
       serviceAccountName: helloworld
       containers:

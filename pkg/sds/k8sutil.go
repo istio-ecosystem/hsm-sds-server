@@ -43,7 +43,7 @@ func (s *sdsservice) SignCSRK8s(csr []byte, resourceName string) ([]byte, error)
 	}()
 
 	// 2. Approve a CSR
-	csrMsg := fmt.Sprintf("CSR (%s) for the certificate (%s) is approved", csrName)
+	csrMsg := fmt.Sprintf("CSR (%s) is approved", csrName)
 	err = approveCSR(csrName, csrMsg, s.sdsClient.Kube(), k8scsr)
 	if err != nil {
 		return nil, fmt.Errorf("unable to approve CSR request. Error: %v", err)

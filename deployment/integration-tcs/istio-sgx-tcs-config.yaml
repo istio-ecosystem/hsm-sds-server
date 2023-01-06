@@ -75,13 +75,13 @@ spec:
       imagePullPolicy: IfNotPresent
     sidecarInjectorWebhook:
       templates:
-        custom: |
+        sgx: |
           metadata:
             annotations:
               sgx.intel.com/quote-provider: aesmd
           spec:
             containers:
-            - name: testsds
+            - name: sdsserver
               image: registry.fi.intel.com/xintongc/sds-server:tcsv2
               imagePullPolicy: IfNotPresent
               lifecycle:

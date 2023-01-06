@@ -69,7 +69,7 @@ spec:
         app: httpbin
         version: v1
       annotations:
-        inject.istio.io/templates: "sidecar,custom"
+        inject.istio.io/templates: "sidecar,sgx"
     spec:
       serviceAccountName: httpbin
       containers:
