@@ -31,18 +31,16 @@ const (
 	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
-	PendingSelfSignerName      = "tcsclusterissuer.tcs.intel.com/sgx-signer"
 	SDSCredNamePrefix          = "sds://"
 	SDSCredNameSuffix          = "-cacert"
 	// one quoteattestation custom resource(cr) will be generated for one Quote Attestation cr
 	// instance name is using quoteAttestationPrefix + corresponding Quote Attestation cr name + "- " + Quote Attestation cr namespace
-	QuoteAttestationPrefix     = "sgxquoteattestation-"
+	QuoteAttestationPrefix = "sgxquoteattestation-"
 	// Max retry time to get signed certificate in kubernetes csr
 	CertWatchTimeout = 60 * time.Second
 	// The interval for reading a certificate
 	CertReadInterval = 500 * time.Millisecond
 	MAXRetryTime     = 20
-	// PendingSelfSignerName      = "kubernetes.io/kube-apiserver-client"
 )
 
 // Default cert expire seconds: one day
@@ -196,7 +194,8 @@ var (
 	PodName            = env.RegisterStringVar("POD_NAME", "default", "").Get()
 	ServiceAccount     = env.RegisterStringVar("SERVICE_ACCOUNT", "default", "Name of service account").Get()
 	NeedQuoteExtension = env.RegisterBoolVar("NEED_QUOTE", true, "If need to add quote extension in csr").Get()
-
+	PendingSignerName  = env.RegisterStringVar("CERT_SIGNER_NAME", "tcsclusterissuer.tcs.intel.com/sgx-signer",
+		"pendingSignerName").Get()
 	SecretRotationGracePeriodRatioEnv = env.Register("SECRET_GRACE_PERIOD_RATIO", 0.5,
 		"The grace period ratio for the cert rotation, by default 0.5.").Get()
 )

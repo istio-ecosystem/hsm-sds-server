@@ -72,7 +72,7 @@ func (s *sdsservice) CreateK8sCSR(csrPem []byte, csrName string) (*certv1.Certif
 		certv1.UsageClientAuth,
 	}
 
-	signerName := security.PendingSelfSignerName
+	signerName := security.PendingSignerName
 
 	for i := 0; i < security.MAXRetryTime; i++ {
 		k8scsr = &certv1.CertificateSigningRequest{

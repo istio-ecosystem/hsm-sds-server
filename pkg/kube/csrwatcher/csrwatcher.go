@@ -122,7 +122,7 @@ func newK8sCSR(name, signerName string, request []byte, usages []certv1.KeyUsage
 		}
 	}
 	if signerName == "" {
-		signerName = security.PendingSelfSignerName
+		signerName = security.PendingSignerName
 	}
 	csr := &certv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{

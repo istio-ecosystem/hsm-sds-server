@@ -31,8 +31,8 @@ This section covers how to install Istio mTLS and gateway private keys protectio
 ### Create signer
 
 ```sh
-export CA_SIGNER_NAME=sgx-signer
-cat << EOF | kubectl create -f -
+$ export CA_SIGNER_NAME=sgx-signer
+$ cat << EOF | kubectl create -f -
 apiVersion: tcs.intel.com/v1alpha1
 kind: TCSClusterIssuer
 metadata:
@@ -46,13 +46,19 @@ EOF
 
 ```sh
 # Get CA Cert and replace it in ./deployment/istio-configs/istio-hsm-config.yaml
-kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tls\.crt}' |base64 -d | sed -e 's;\(.*\);        \1;g'
+$ kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tls\.crt}' |base64 -d | sed -e 's;\(.*\);        \1;g'
 ```
+
+### Build image
+```sh
+$ make docker
+```
+> NOTE: If you are using containerd as the container runtime, run `make ctr` to build the image instead.
 ### Protect the private keys of workloads with HSM
 1. Install Istio
 
 ```sh
-istioctl install -f ./deployment/istio-configs/istio-hsm-config.yaml -y
+$ istioctl install -f ./deployment/istio-configs/istio-hsm-config.yaml -y
 ```
 
 > NOTE: You can also customize the `istio-hsm-config.yaml` according to your needs. If you want do the quote verification, you should set the `NEED_QUOTE` env as `true`. And if you are using the TCS v1alpha1 api, you can set the `RANDOM_NONCE` as `false`.
@@ -74,8 +80,8 @@ istiod-6cf88b78dc-dthpw                 1/1     Running   0          70m
 3. Create sleep and httpbin deployment:
 > NOTE: If you want use the sds-custom injection template, you need to set the annotations `inject.istio.io/templates` for both `sidecar` and `sgx`. And the ClusterRole is also required.
 ```sh
-kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/sleep-hsm.yaml )
-kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/httpbin-hsm.yaml )
+$ kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/sleep-hsm.yaml )
+$ kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/httpbin-hsm.yaml )
 ```
 
 4. Successful deployment looks like this:
