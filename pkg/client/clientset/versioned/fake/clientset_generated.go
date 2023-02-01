@@ -20,8 +20,8 @@ package fake
 
 import (
 	clientset "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
-	tcsv1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha1"
-	faketcsv1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha1/fake"
+	tcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
+	faketcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -79,7 +79,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// TcsV1alpha1 retrieves the TcsV1alpha1Client
-func (c *Clientset) TcsV1alpha1() tcsv1alpha1.TcsV1alpha1Interface {
-	return &faketcsv1alpha1.FakeTcsV1alpha1{Fake: &c.Fake}
+// TcsV1alpha2 retrieves the TcsV1alpha2Client
+func (c *Clientset) TcsV1alpha2() tcsv1alpha2.TcsV1alpha2Interface {
+	return &faketcsv1alpha2.FakeTcsV1alpha2{Fake: &c.Fake}
 }

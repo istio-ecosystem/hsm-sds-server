@@ -65,5 +65,5 @@ update-codegen: | k8s-codegen-tools
 .PHONY: update-quoteattestation
 update-quoteattestation:
 	git clone $(QUOTEATTESTATION_API)
-	mv ./trusted-certificate-issuer/api/v1alpha1/quoteattestation_types.go ./pkg/apis/tcs/v1alpha1/types_quoteattestation.go
+	mv ./trusted-certificate-issuer/api/v1alpha2/quoteattestation_types.go ./pkg/apis/tcs/v1alpha2/types_quoteattestation.go
 	rm -rf ./trusted-certificate-issuer

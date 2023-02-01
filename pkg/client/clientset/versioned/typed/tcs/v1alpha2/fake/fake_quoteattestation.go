@@ -21,7 +21,7 @@ package fake
 import (
 	"context"
 
-	v1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
+	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,29 +32,29 @@ import (
 
 // FakeQuoteAttestations implements QuoteAttestationInterface
 type FakeQuoteAttestations struct {
-	Fake *FakeTcsV1alpha1
+	Fake *FakeTcsV1alpha2
 	ns   string
 }
 
-var quoteattestationsResource = schema.GroupVersionResource{Group: "tcs.intel.com", Version: "v1alpha1", Resource: "quoteattestations"}
+var quoteattestationsResource = schema.GroupVersionResource{Group: "tcs.intel.com", Version: "v1alpha2", Resource: "quoteattestations"}
 
-var quoteattestationsKind = schema.GroupVersionKind{Group: "tcs.intel.com", Version: "v1alpha1", Kind: "QuoteAttestation"}
+var quoteattestationsKind = schema.GroupVersionKind{Group: "tcs.intel.com", Version: "v1alpha2", Kind: "QuoteAttestation"}
 
 // Get takes name of the quoteAttestation, and returns the corresponding quoteAttestation object, and an error if there is any.
-func (c *FakeQuoteAttestations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.QuoteAttestation, err error) {
+func (c *FakeQuoteAttestations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.QuoteAttestation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(quoteattestationsResource, c.ns, name), &v1alpha1.QuoteAttestation{})
+		Invokes(testing.NewGetAction(quoteattestationsResource, c.ns, name), &v1alpha2.QuoteAttestation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.QuoteAttestation), err
+	return obj.(*v1alpha2.QuoteAttestation), err
 }
 
 // List takes label and field selectors, and returns the list of QuoteAttestations that match those selectors.
-func (c *FakeQuoteAttestations) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.QuoteAttestationList, err error) {
+func (c *FakeQuoteAttestations) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.QuoteAttestationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(quoteattestationsResource, quoteattestationsKind, c.ns, opts), &v1alpha1.QuoteAttestationList{})
+		Invokes(testing.NewListAction(quoteattestationsResource, quoteattestationsKind, c.ns, opts), &v1alpha2.QuoteAttestationList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +64,8 @@ func (c *FakeQuoteAttestations) List(ctx context.Context, opts v1.ListOptions) (
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.QuoteAttestationList{ListMeta: obj.(*v1alpha1.QuoteAttestationList).ListMeta}
-	for _, item := range obj.(*v1alpha1.QuoteAttestationList).Items {
+	list := &v1alpha2.QuoteAttestationList{ListMeta: obj.(*v1alpha2.QuoteAttestationList).ListMeta}
+	for _, item := range obj.(*v1alpha2.QuoteAttestationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -81,43 +81,43 @@ func (c *FakeQuoteAttestations) Watch(ctx context.Context, opts v1.ListOptions) 
 }
 
 // Create takes the representation of a quoteAttestation and creates it.  Returns the server's representation of the quoteAttestation, and an error, if there is any.
-func (c *FakeQuoteAttestations) Create(ctx context.Context, quoteAttestation *v1alpha1.QuoteAttestation, opts v1.CreateOptions) (result *v1alpha1.QuoteAttestation, err error) {
+func (c *FakeQuoteAttestations) Create(ctx context.Context, quoteAttestation *v1alpha2.QuoteAttestation, opts v1.CreateOptions) (result *v1alpha2.QuoteAttestation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(quoteattestationsResource, c.ns, quoteAttestation), &v1alpha1.QuoteAttestation{})
+		Invokes(testing.NewCreateAction(quoteattestationsResource, c.ns, quoteAttestation), &v1alpha2.QuoteAttestation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.QuoteAttestation), err
+	return obj.(*v1alpha2.QuoteAttestation), err
 }
 
 // Update takes the representation of a quoteAttestation and updates it. Returns the server's representation of the quoteAttestation, and an error, if there is any.
-func (c *FakeQuoteAttestations) Update(ctx context.Context, quoteAttestation *v1alpha1.QuoteAttestation, opts v1.UpdateOptions) (result *v1alpha1.QuoteAttestation, err error) {
+func (c *FakeQuoteAttestations) Update(ctx context.Context, quoteAttestation *v1alpha2.QuoteAttestation, opts v1.UpdateOptions) (result *v1alpha2.QuoteAttestation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(quoteattestationsResource, c.ns, quoteAttestation), &v1alpha1.QuoteAttestation{})
+		Invokes(testing.NewUpdateAction(quoteattestationsResource, c.ns, quoteAttestation), &v1alpha2.QuoteAttestation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.QuoteAttestation), err
+	return obj.(*v1alpha2.QuoteAttestation), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeQuoteAttestations) UpdateStatus(ctx context.Context, quoteAttestation *v1alpha1.QuoteAttestation, opts v1.UpdateOptions) (*v1alpha1.QuoteAttestation, error) {
+func (c *FakeQuoteAttestations) UpdateStatus(ctx context.Context, quoteAttestation *v1alpha2.QuoteAttestation, opts v1.UpdateOptions) (*v1alpha2.QuoteAttestation, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(quoteattestationsResource, "status", c.ns, quoteAttestation), &v1alpha1.QuoteAttestation{})
+		Invokes(testing.NewUpdateSubresourceAction(quoteattestationsResource, "status", c.ns, quoteAttestation), &v1alpha2.QuoteAttestation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.QuoteAttestation), err
+	return obj.(*v1alpha2.QuoteAttestation), err
 }
 
 // Delete takes name of the quoteAttestation and deletes it. Returns an error if one occurs.
 func (c *FakeQuoteAttestations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(quoteattestationsResource, c.ns, name, opts), &v1alpha1.QuoteAttestation{})
+		Invokes(testing.NewDeleteActionWithOptions(quoteattestationsResource, c.ns, name, opts), &v1alpha2.QuoteAttestation{})
 
 	return err
 }
@@ -126,17 +126,17 @@ func (c *FakeQuoteAttestations) Delete(ctx context.Context, name string, opts v1
 func (c *FakeQuoteAttestations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(quoteattestationsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.QuoteAttestationList{})
+	_, err := c.Fake.Invokes(action, &v1alpha2.QuoteAttestationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched quoteAttestation.
-func (c *FakeQuoteAttestations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.QuoteAttestation, err error) {
+func (c *FakeQuoteAttestations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.QuoteAttestation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(quoteattestationsResource, c.ns, name, pt, data, subresources...), &v1alpha1.QuoteAttestation{})
+		Invokes(testing.NewPatchSubresourceAction(quoteattestationsResource, c.ns, name, pt, data, subresources...), &v1alpha2.QuoteAttestation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.QuoteAttestation), err
+	return obj.(*v1alpha2.QuoteAttestation), err
 }

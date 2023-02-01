@@ -33,8 +33,8 @@ import (
 	"istio.io/istio/operator/pkg/apis"
 	"istio.io/istio/pkg/kube/mcs"
 
-	tcsapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
-	tcsv1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
+	tcsapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	tcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
 	qaapiinformer "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions"
 )
 
@@ -70,7 +70,7 @@ type Client interface {
 	QaAPIInformer() qaapiinformer.SharedInformerFactory
 
 	// QaAPI returns the quote attestation kube client
-	QaAPI() tcsv1alpha1.Interface
+	QaAPI() tcsv1alpha2.Interface
 
 	// RunAndWait starts all informers and waits for their caches to sync.
 	// Warning: this must be called AFTER .Informer() is called, which will register the informer.
@@ -103,7 +103,7 @@ type SdsClient struct {
 	fastSync               bool
 	informerWatchesPending *atomic.Int32
 
-	qaapi            tcsv1alpha1.Interface
+	qaapi            tcsv1alpha2.Interface
 	qaInformer       qaapiinformer.SharedInformerFactory
 }
 
@@ -151,7 +151,7 @@ func newSDSClientInternal(clientFactory *clientFactory, revision string) (*SdsCl
 	}
 	c.extInformer = kubeExtInformers.NewSharedInformerFactory(c.extSet, resyncInterval)
 
-	c.qaapi , err = tcsv1alpha1.NewForConfig(c.config)
+	c.qaapi , err = tcsv1alpha2.NewForConfig(c.config)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (c *SdsClient) ExtInformer() kubeExtInformers.SharedInformerFactory {
 func (c *SdsClient) QaAPIInformer() qaapiinformer.SharedInformerFactory {
 	return c.qaInformer
 }
-func (c *SdsClient) QaAPI() tcsv1alpha1.Interface{
+func (c *SdsClient) QaAPI() tcsv1alpha2.Interface{
 	return c.qaapi
 }
 
