@@ -12,8 +12,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	quoteapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha1"
-	v1alpha1 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha1"
+	quoteapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/constants"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
 	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
@@ -41,7 +41,7 @@ type GatewayWatcher struct {
 	queue      queue.Queue
 	gwPodLabel labels.Instance
 	gwSM       *security.SecretManager
-	tcsClient  v1alpha1.TcsV1alpha1Interface
+	tcsClient  v1alpha2.TcsV1alpha2Interface
 	kubeClient kubernetes.Interface
 }
 
@@ -202,7 +202,7 @@ func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*Gateway
 		kubeClient: client.Kube(),
 	}
 
-	tcsClient, err := v1alpha1.NewForConfig(client.RESTConfig())
+	tcsClient, err := v1alpha2.NewForConfig(client.RESTConfig())
 	if err != nil {
 		return nil, fmt.Errorf("error: no tcs client can be found by kube/istio client.")
 	}
@@ -256,7 +256,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 	if err := sgxctx.GenerateQuoteAndPublicKey(true, signerName); err != nil {
 		return fmt.Errorf("failed to generate sgx quote and public key %s", err)
 	}
-	quote, _, err := sgxctx.QuoteandNonce(true, signerName)
+	quote, nonce, err := sgxctx.QuoteandNonce(true, signerName)
 	if err != nil {
 		return fmt.Errorf("get sgx quote error %s", err)
 	}
@@ -279,6 +279,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			Type:         quoteapi.QuoteAttestationRequestType(quoteapi.RequestTypeKeyProvisioning),
 			Quote:        quote,
 			QuoteVersion: DefaultQuoteVersion,
+			Nonce:        nonce,
 			SignerName:   signerName,
 			ServiceID:    tokenLabel,
 			PublicKey:    publicKey,
@@ -302,6 +303,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			Type:         quoteapi.QuoteAttestationRequestType(quoteapi.RequestTypeKeyProvisioning),
 			Quote:        quote,
 			QuoteVersion: DefaultQuoteVersion,
+			Nonce:        nonce,
 			SignerName:   signerName,
 			ServiceID:    tokenLabel,
 			PublicKey:    publicKey,

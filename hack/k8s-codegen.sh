@@ -45,14 +45,14 @@ module_name="github.com/intel-innersource/applications.services.cloud.hsm-sds-se
 
 # Generate deepcopy functions for all internal and external APIs
 deepcopy_inputs=(
-  pkg/apis/tcs/v1alpha1 \
+  pkg/apis/tcs/v1alpha2 \
 )
 
 client_subpackage="pkg/client"
 client_package="${module_name}/${client_subpackage}"
 # Generate clientsets, listers and informers for user-facing API types
 client_inputs=(
-  pkg/apis/tcs/v1alpha1 \
+  pkg/apis/tcs/v1alpha2 \
 )
 
 # clean will delete files matching name in path.
