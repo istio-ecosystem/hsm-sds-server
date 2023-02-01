@@ -279,13 +279,11 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			Type:         quoteapi.QuoteAttestationRequestType(quoteapi.RequestTypeKeyProvisioning),
 			Quote:        quote,
 			QuoteVersion: DefaultQuoteVersion,
+			Nonce:        nonce,
 			SignerName:   signerName,
 			ServiceID:    tokenLabel,
 			PublicKey:    publicKey,
 		},
-	}
-	if gw.gwSM.SgxConfigs.UseRandonNonce {
-		quoteAttestation.Spec.Nonce = nonce
 	}
 
 	//If not found object, create a new one
@@ -305,12 +303,10 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			Type:         quoteapi.QuoteAttestationRequestType(quoteapi.RequestTypeKeyProvisioning),
 			Quote:        quote,
 			QuoteVersion: DefaultQuoteVersion,
+			Nonce:        nonce,
 			SignerName:   signerName,
 			ServiceID:    tokenLabel,
 			PublicKey:    publicKey,
-		}
-		if gw.gwSM.SgxConfigs.UseRandonNonce {
-			quoteAttestation.Spec.Nonce = nonce
 		}
 		_, err := gw.tcsClient.QuoteAttestations(ns).Update(ctx, quoteAttestation, metav1.UpdateOptions{})
 		if err != nil {
