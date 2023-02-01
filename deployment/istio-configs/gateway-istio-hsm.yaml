@@ -10,6 +10,8 @@ spec:
     pilot:
       k8s:
         env:
+          - name: CERT_SIGNER_NAME
+            value: tcsclusterissuer.tcs.intel.com/sgx-signer
           - name: CERT_SIGNER_DOMAIN
             value: tcsclusterissuer.tcs.intel.com
           - name: EXTERNAL_CA
@@ -121,6 +123,8 @@ spec:
               - name: TRUST_DOMAIN
                 value: "{{ . }}"
               {{- end }}
+              - name: CERT_SIGNER_NAME
+                value: tcsclusterissuer.tcs.intel.com/sgx-signer
               - name: CERT_SIGNER_DOMAIN
                 value: tcsclusterissuer.tcs.intel.com
               - name: EXTERNAL_CA
@@ -160,6 +164,8 @@ spec:
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
               env:
+              - name: CERT_SIGNER_NAME
+                value: tcsclusterissuer.tcs.intel.com/sgx-signer
               - name: CERT_SIGNER_DOMAIN
                 value: tcsclusterissuer.tcs.intel.com
               - name: EXTERNAL_CA
@@ -212,6 +218,8 @@ spec:
               value: "false"
             - name: RANDOM_NONCE
               value: "false"
+            - name: CERT_SIGNER_NAME
+              value: tcsclusterissuer.tcs.intel.com/sgx-signer
             - name: CERT_SIGNER_DOMAIN
               value: tcsclusterissuer.tcs.intel.com
             - name: EXTERNAL_CA
