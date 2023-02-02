@@ -134,7 +134,7 @@ istiod-65db6d8666-jgmf7                 1/1     Running   0          75s
 3. Deploy sample application
 
 Create httpbin deployment with gateway CR:
-> NOTE: If you want use the sds-custom injection template, you need to set the annotations `inject.istio.io/templates` for both `sidecar` and `sgx`. And the ClusterRole is also required.
+> NOTE: If you want to use the sds-custom injection template, you need to set the annotations `inject.istio.io/templates` for both `sidecar` and `sgx`. And the ClusterRole is also required.
 ```sh
 kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/httpbin-hsm.yaml )
 kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/httpbin-gateway.yaml )
