@@ -224,7 +224,7 @@ It will be okay if got below response:
 
 ## Cleaning Up
 
-1. Cleaning up for workloads: 
+1. Clean up for workloads: 
 ```sh
 # uninstall istio
 $ istioctl x uninstall --purge -y
