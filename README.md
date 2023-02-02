@@ -206,7 +206,7 @@ $ kubectl create secret generic -n default wrapped-key --from-literal=tls.key=${
 ```
 Edit quoteattestations.tcs.intel.com $QA_NAME via commond `kubectl edit quoteattestations.tcs.intel.com $QA_NAME -n default` and append field `secretName: wrapped-key` for its spec section.
 
-The above `httpbin` applications have enabled SGX and store the private keys inside SGX enclave, completed the TLS handshake and established a connection with each other and communicating normally.
+The above `httpbin` application has enabled SGX and store the private key inside the SGX enclave, completed the TLS handshakes and established a connection with each other and communicating normally.
 
 6. Verify the service accessibility
 
