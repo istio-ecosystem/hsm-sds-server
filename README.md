@@ -204,7 +204,7 @@ $ WRAPPED_KEY=$(km-wrap --signer tcsclusterissuer.tcs.intel.com/sgx-signer --pub
 
 $ kubectl create secret generic -n default wrapped-key --from-literal=tls.key=${WRAPPED_KEY} --from-literal=tls.crt=$(base64 -w 0 < $CREDENTIAL/httpbin.crt)
 ```
-Edit quoteattestations.tcs.intel.com $QA_NAME via commond `kubectl edit quoteattestations.tcs.intel.com $QA_NAME -n default` and append field `secretName: wrapped-key` for it.
+Edit quoteattestations.tcs.intel.com $QA_NAME via commond `kubectl edit quoteattestations.tcs.intel.com $QA_NAME -n default` and append field `secretName: wrapped-key` for its spec section.
 
 The above `httpbin` applications have enabled SGX and store the private keys inside SGX enclave, completed the TLS handshake and established a connection with each other and communicating normally.
 
