@@ -233,7 +233,7 @@ $ kubectl delete -f ./deployment/istio-configs/sleep-sgx-mTLS.yaml
 $ kubectl delete -f ./deployment/istio-configs/httpbin-sgx-mTLS.yaml
 ```
 
-2. Cleaning up for gateways: 
+2. Clean up for gateways: 
 ```sh
 # uninstall istio
 $ istioctl x uninstall --purge -y
