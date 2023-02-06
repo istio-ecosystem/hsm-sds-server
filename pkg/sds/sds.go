@@ -69,7 +69,7 @@ type VersionInfoandNonce struct {
 var (
 	versionCounter int64
 	versionInfo    = strconv.FormatInt(versionCounter, 10)
-	nonce, _       = nextNonce()
+	nonce          string
 )
 
 // newSDSService creates Secret Discovery Service which implements envoy SDS API.
@@ -235,7 +235,6 @@ func (s *sdsservice) Close() {
 func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *discovery.DiscoveryResponse, err error) {
 	log.Info("Build respunse now: ", time.Now())
 	log.Info(s.VersionInfoandNonce)
-	versionCounter++
 	resp = &discovery.DiscoveryResponse{
 		TypeUrl: req.TypeUrl,
 		// if first request, versionInfo and Nonce is empty
@@ -354,7 +353,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 			Name:     resourceName,
 			Resource: res,
 		}))
-		resp.Nonce = nonce
+		// resp.Nonce = nonce
 		if V, ok := s.VersionInfoandNonce[resourceName]; ok {
 			V.VersionInfo = versionInfo
 			V.Nonce = nonce
@@ -365,6 +364,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				Nonce:       nonce,
 			}
 		}
+
 	}
 
 	log.Info("DEBUG SDS Resp: ", resp)
@@ -548,11 +548,17 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 	}
 	if req.GetResponseNonce() == "" {
 		log.Info("DEBUG Envoy Request nonce is none, need response")
+		s.st.SgxctxLock.Lock()
+		versionCounter++
+		nonce, _ = nextNonce()
+		s.st.SgxctxLock.Unlock()
 		return true
 	} else if (req.GetErrorDetail() != nil) || (req.VersionInfo != s.VersionInfoandNonce[req.ResourceNames[0]].VersionInfo) {
 		log.Warnf("Get NACK from Envoy: ", req.GetErrorDetail().GetMessage())
+		s.st.SgxctxLock.Lock()
 		nonce, _ = nextNonce()
 		versionCounter++
+		s.st.SgxctxLock.Unlock()
 		return false
 	} else {
 		log.Info("Get ACK from Envoy successfully , no response")
