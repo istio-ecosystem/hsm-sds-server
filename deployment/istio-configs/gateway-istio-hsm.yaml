@@ -189,16 +189,19 @@ spec:
           - name: sdsserver
             image: sds-server/sds-server:latest
             imagePullPolicy: IfNotPresent
-            command: ["bash", "-c", "sleep 5s; ls -la /home/istio-proxy/sgx/lib; ./sds/sds-server"]
             lifecycle:
               postStart:
                 exec:
                   command: ["/bin/sh", "-c", "./home/istio-proxy/prepare.sh"]
             resources:
               limits:
+                cpu: 200m
+                memory: 500Mi
                 sgx.intel.com/enclave: 1
                 sgx.intel.com/epc: 1Mi
               requests:
+                cpu: 200m
+                memory: 300Mi
                 sgx.intel.com/enclave: 1
                 sgx.intel.com/epc: 1Mi
             env:
