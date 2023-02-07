@@ -38,11 +38,10 @@ kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tl
 
 ```
 istioctl install -f deployment/istio-configs/istio-hsm-config.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
-istioctl install -f deployment/istio-configs/gateway-istio-hsm.yaml -y --set values.global.proxy.logLevel=debug --set values.global.logging.level=all:debug
 
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-hsm.yaml)
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/sleep-gateway.yaml)
+kubectl apply -f deployment/istio-configs/sleep-gateway.yaml
 
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml)
 ```
@@ -108,7 +107,7 @@ istioctl install -f deployment/istio-configs/gateway-istio-hsm.yaml -y --set val
 
 kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.yaml)
 
-kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-gateway.yaml)
+kubectl apply -f deployment/istio-configs/httpbin-gateway.yaml
 ```
 
 ## Get the credential information
