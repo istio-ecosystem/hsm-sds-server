@@ -218,9 +218,9 @@ spec:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
             - name: NEED_QUOTE
-              value: "false"
+              value: "true"
             - name: RANDOM_NONCE
-              value: "false"
+              value: "true"
             - name: CERT_SIGNER_NAME
               value: tcsclusterissuer.tcs.intel.com/sgx-signer
             - name: CERT_SIGNER_DOMAIN

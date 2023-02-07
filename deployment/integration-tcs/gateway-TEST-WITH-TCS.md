@@ -12,7 +12,7 @@ spec:
     selfSign: false
 EOF
 
-# Get the CA Cert, then export the CA Cert in CACERT and replace it in istio-hsm-config.yaml caCertificates field
+# Get the CA Cert, then replace it in istio-hsm-config.yaml in caCertificates field
 $(kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tls\.crt}' |base64 -d | sed -e 's;\(.*\);        \1;g')
 
 # Create the CA certificate file
@@ -28,6 +28,10 @@ kubectl apply -f httpbin-gateway.yaml
 # Check the quoteattestations CR for gateway
 kubectl get quoteattestations.tcs.intel.com
 export QA_NAME=<The Name of The quoteattestations CR>
+
+# Step 1. Obtain the secret name from ${QA_NAME} mentioned above
+# Step 2. Obtain the CA cert information from the secret name field tls.crt in step 1
+# Step 3. Store the CA cert in cacert.crt
 
 # Verify the result 
 export INGRESS_NAME=istio-ingressgateway
