@@ -24,7 +24,7 @@ rules:
   resources: ["certificatesigningrequests", "certificatesigningrequests/approval", "certificatesigningrequests/status"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["certificates.k8s.io"]
-  resourceNames: [tcsclusterissuer.tcs.intel.com/*]
+  resourceNames: [tcsissuer.tcs.intel.com/*]
   resources: ["signers"]
   verbs: ["approve"]
 ---

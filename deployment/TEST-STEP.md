@@ -110,6 +110,8 @@ kubectl apply -f <(istioctl kube-inject -f deployment/istio-configs/httpbin-hsm.
 kubectl apply -f deployment/istio-configs/httpbin-gateway.yaml
 ```
 
+Note: please execute `kubectl apply -f deployment/istio-configs/gateway-clusterrole.yaml` to make sure that the ingress gateway has enough privilege.
+
 ## Get the credential information
 
 ### We use command line tools to read and write the QuoteAttestation manually. You get the tools, `km-attest` and `km-wrap`, provided by the [Intel® KMRA project](https://www.intel.com/content/www/us/en/developer/topic-technology/open/key-management-reference-application/overview.html).

@@ -103,7 +103,12 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 		// create quoteAttestation CR for gateway CR
 		instanceName := security.QuoteAttestationPrefix + security.PodName + "-" + credName
 		if credName != "" {
-			if err := gw.QuoteAttestationDeliver(ctx, credName, instanceName, gatewayCR.Namespace); err != nil {
+			secretName := credName
+			// it's unnecessary to provide the secret name if it's manual operation
+			if security.ManualOPForGateway {
+				secretName = ""
+			}
+			if err := gw.QuoteAttestationDeliver(ctx, credName, instanceName, secretName, gatewayCR.Namespace); err != nil {
 				log.Errorf("failed to created or updated quoteAttestation CR %s", err)
 				return
 			}
@@ -247,7 +252,7 @@ func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*Gateway
 	return gw, reErr
 }
 
-func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerName, instanceName, ns string) error {
+func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerName, instanceName, secretName, ns string) error {
 	sgxctx := gw.gwSM.SgxContext
 	if sgxctx == nil {
 		log.Errorf("sgx context for this hsm custom resource has not been initialized")
@@ -283,6 +288,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			SignerName:   signerName,
 			ServiceID:    tokenLabel,
 			PublicKey:    publicKey,
+			SecretName:   secretName,
 		},
 	}
 
@@ -307,6 +313,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 			SignerName:   signerName,
 			ServiceID:    tokenLabel,
 			PublicKey:    publicKey,
+			SecretName:   secretName,
 		}
 		_, err := gw.tcsClient.QuoteAttestations(ns).Update(ctx, quoteAttestation, metav1.UpdateOptions{})
 		if err != nil {

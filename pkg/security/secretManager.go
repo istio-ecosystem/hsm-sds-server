@@ -194,6 +194,7 @@ var (
 	PodName            = env.RegisterStringVar("POD_NAME", "default", "").Get()
 	ServiceAccount     = env.RegisterStringVar("SERVICE_ACCOUNT", "default", "Name of service account").Get()
 	NeedQuoteExtension = env.RegisterBoolVar("NEED_QUOTE", true, "If need to add quote extension in csr").Get()
+	ManualOPForGateway = env.RegisterBoolVar("MANUAL_OPS", true, "Manual operation for gateway if there is no key server, true by default").Get()
 	PendingSignerName  = env.RegisterStringVar("CERT_SIGNER_NAME", "tcsclusterissuer.tcs.intel.com/sgx-signer",
 		"pendingSignerName").Get()
 	SecretRotationGracePeriodRatioEnv = env.Register("SECRET_GRACE_PERIOD_RATIO", 0.5,
