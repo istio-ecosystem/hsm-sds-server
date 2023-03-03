@@ -11,7 +11,7 @@ spec:
       name: https
       protocol: HTTPS
     hosts:
-    - httpbin.example.com
+    - httpbin.testsds.com 
     tls:
       mode: SIMPLE
       credentialName: sds://httpbin.testsds.com 
@@ -22,7 +22,7 @@ metadata:
   name: httpbin 
 spec:
   hosts:
-  - "httpbin.example.com"
+  - "httpbin.testsds.com"
   gateways:
   - testuds-gateway
   http:

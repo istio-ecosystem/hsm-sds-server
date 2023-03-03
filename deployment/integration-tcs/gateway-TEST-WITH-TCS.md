@@ -19,7 +19,9 @@ $(kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.
 echo $CACERT > cacert.crt
 
 # Install Istio, if set `NEED_QUOTE` as true, sds-server will add quote/publickey extension to the csr 
-istioctl install -f istio-gateway-sgx-tcs-config.yaml -y
+istioctl install -f gateway-istio-sgx-tcs-config.yaml -y
+
+Note: please execute `kubectl apply -f gateway-sgx-rbac.yaml` to make sure that the ingress gateway has enough privilege.
 
 # Deploy workload and its gateway
 kubectl apply -f <(istioctl kube-inject -f httpbin-hsm.yaml )

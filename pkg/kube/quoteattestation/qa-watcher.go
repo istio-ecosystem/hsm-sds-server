@@ -91,30 +91,33 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		log.Info("checking quoteattestation status")
 		log.Info("QA Status: ", qaObj.Status)
 		log.Info("QA SecretName: ", qaObj.Spec.SecretName)
-		// var attesReady bool
-		// var cMessage string
+		var attesReady bool
+		var cMessage string
 		if qaObj.Spec.SecretName == "" {
+			log.Warnf("The secret name in %s is nil.", req.Name)
 			return nil
 		}
-
-		/*if len(qaObj.Status.Conditions) == 0 {
-			log.Info("QA Conditions lenght is: ", 0)
-			return nil
-		}
-		for _, c := range qaObj.Status.Conditions {
-			log.Info("QuoteAttestationWatcher Reconcile QA status: ", c.Type)
-			if c.Type == quoteapi.ConditionReady {
-				attesReady = true
-				break
-			} else {
-				cMessage += "\n c.Message"
+		// it's unnecessary to provide the secret name if it's manual operation
+		if !security.ManualOPForGateway {
+			if len(qaObj.Status.Conditions) == 0 {
+				log.Info("QA Conditions lenght is: ", 0)
+				return nil
+			}
+			for _, c := range qaObj.Status.Conditions {
+				log.Info("QuoteAttestationWatcher Reconcile QA status: ", c.Type)
+				if c.Type == quoteapi.ConditionReady {
+					attesReady = true
+					break
+				} else {
+					cMessage += "\n c.Message"
+				}
+			}
+			if !attesReady {
+				message := "quote attestation verification failure"
+				log.Error(fmt.Errorf(message), "message", cMessage)
+				return fmt.Errorf(message)
 			}
 		}
-		if !attesReady {
-			message := "quote attestation verification failure"
-			log.Error(fmt.Errorf(message), "message", cMessage)
-			return fmt.Errorf(message)
-		}*/
 		// attestation passed. Quote get verified
 		log.Info("quoteattestation verification success")
 		signer := qaObj.Spec.SignerName
