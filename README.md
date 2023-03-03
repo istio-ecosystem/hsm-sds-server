@@ -118,6 +118,7 @@ You can also customize the `intel-istio-sgx-gateway.yaml` according to your need
 ```sh
 istioctl install -f ./deployment/istio-configs/gateway-istio-hsm.yaml -y
 ```
+Note: please execute `kubectl apply -f deployment/istio-configs/gateway-clusterrole.yaml` to make sure that the ingress gateway has enough privilege.
 
 2. Verifiy the pods are running
 
