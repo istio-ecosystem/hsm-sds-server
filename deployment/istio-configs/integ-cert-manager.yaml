@@ -4,8 +4,8 @@ metadata:
   name: istio
 spec:
   profile: default
-  hub: "istio"
-  tag: "sgx-1122"
+  hub: "intel"
+  tag: "1.16.1-intel.0"
   components:
     pilot:
       k8s:
