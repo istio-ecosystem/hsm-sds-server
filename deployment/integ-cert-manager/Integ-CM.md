@@ -35,7 +35,7 @@ spec:
 EOF
 $ kubectl apply -f ./istio-cm-issuer.yaml
 
-# Get the issuer certificate and replace cert in the chart
+# Get the issuer certificate and replace it in the caCertificates.pem field of the yaml file
 $ kubectl get clusterissuers istio-system -o jsonpath='{.spec.ca.secretName}' | xargs kubectl get secret -n cert-manager -o jsonpath='{.data.ca\.crt}' | base64 -d
 
 # install with mTLS chart
