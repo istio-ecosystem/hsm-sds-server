@@ -230,8 +230,8 @@ It will be okay if got below response:
 # uninstall istio
 $ istioctl x uninstall --purge -y
 # delete workloads
-$ kubectl delete -f ./deployment/istio-configs/sleep-sgx-mTLS.yaml
-$ kubectl delete -f ./deployment/istio-configs/httpbin-sgx-mTLS.yaml
+$ kubectl delete -f ./deployment/istio-configs/sleep-hsm.yaml
+$ kubectl delete -f ./deployment/istio-configs/httpbin-hsm.yaml
 ```
 
 2. Clean up for gateways: 
