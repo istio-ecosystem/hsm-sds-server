@@ -179,7 +179,7 @@ spec:
           sgx.intel.com/quote-provider: aesmd
         additionalContainers:
           - name: sdsserver
-            image: sds-server/sds-server:latest 
+            image: sds-server/sds-server:latest
             imagePullPolicy: IfNotPresent 
             lifecycle:
               postStart:
@@ -210,7 +210,7 @@ spec:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
             - name: MANUAL_OPS 
-              value: "false"
+              value: "true"
             - name: NEED_QUOTE
               value: "false"
             - name: RANDOM_NONCE

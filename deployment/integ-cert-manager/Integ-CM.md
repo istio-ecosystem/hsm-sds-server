@@ -38,10 +38,14 @@ $ kubectl apply -f ./istio-cm-issuer.yaml
 # Get the issuer certificate and replace it in the caCertificates.pem field of the yaml file
 $ kubectl get clusterissuers istio-system -o jsonpath='{.spec.ca.secretName}' | xargs kubectl get secret -n cert-manager -o jsonpath='{.data.ca\.crt}' | base64 -d
 
+# apply TCS crd
+$ kubectl apply -f quote crd
+
 # install with mTLS chart
 $ istioctl install -f integ-cert-manager-mTLS.yaml -y
 
 # Or install with gateway chart
+$ apply RBAC
 $ istioctl install -f integ-cert-manager-gateway.yaml -y
 
 # install workload

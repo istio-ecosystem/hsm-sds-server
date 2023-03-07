@@ -11,13 +11,13 @@ spec:
       k8s:
         env:
           - name: CERT_SIGNER_NAME
-            value: clusterissuers.cert-manager.io/istio-system
+            value: tcsclusterissuer.tcs.intel.com/sgx-signer
           - name: CERT_SIGNER_DOMAIN
-            value: clusterissuers.cert-manager.io
+            value: tcsclusterissuer.tcs.intel.com
           - name: EXTERNAL_CA
             value: ISTIOD_RA_KUBERNETES_API
           - name: PILOT_CERT_PROVIDER
-            value: k8s.io/clusterissuers.cert-manager.io/istio-system
+            value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
         overlays:
           - kind: ClusterRole
             name: istiod-clusterrole-istio-system
@@ -27,18 +27,22 @@ spec:
                   apiGroups:
                   - certificates.k8s.io
                   resourceNames:
-                  - clusterissuers.cert-manager.io/foo
-                  - clusterissuers.cert-manager.io/bar
-                  - clusterissuers.cert-manager.io/istio-system
+                  - tcsclusterissuer.tcs.intel.com/*
                   resources:
                   - signers
                   verbs:
                   - approve
+                  - get
+                  - list
+                  - patch
+                  - delete
+                  - watch
+                  - update
   meshConfig:
     defaultConfig:
       proxyMetadata:
         PROXY_CONFIG_XDS_AGENT: "true"
-        ISTIO_META_CERT_SIGNER: istio-system
+        ISTIO_META_CERT_SIGNER: sgx-signer
     caCertificates:
       - pem: |
           -----BEGIN CERTIFICATE-----
@@ -68,7 +72,7 @@ spec:
           ccpv5ngljFfyux9TknYH8Eb85N1Io7JA/Vm9eYv9MJE=
           -----END CERTIFICATE-----
         certSigners:
-        - clusterissuers.cert-manager.io/istio-system
+        - tcsclusterissuer.tcs.intel.com/sgx-signer
   values:
     global:
       imagePullPolicy: IfNotPresent
@@ -102,7 +106,7 @@ spec:
               - name: NEED_QUOTE
                 value: "false"
               - name: RANDOM_NONCE
-                value: "true"
+                value: "false"
               - name: POD_NAME
                 valueFrom:
                   fieldRef:
@@ -120,13 +124,13 @@ spec:
                 value: "{{ . }}"
               {{- end }}
               - name: CERT_SIGNER_NAME
-                value: clusterissuers.cert-manager.io/istio-system
+                value: tcsclusterissuer.tcs.intel.com/sgx-signer
               - name: CERT_SIGNER_DOMAIN
-                value: clusterissuers.cert-manager.io
+                value: tcsclusterissuer.tcs.intel.com
               - name: EXTERNAL_CA
                 value: ISTIOD_RA_KUBERNETES_API
               - name: PILOT_CERT_PROVIDER
-                value: k8s.io/clusterissuers.cert-manager.io/istio-system
+                value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
               volumeMounts:
               - name: workload-socket
                 mountPath: /var/run/secrets/workload-spiffe-uds
@@ -161,13 +165,13 @@ spec:
                   sgx.intel.com/epc: 1Mi 
               env:
               - name: CERT_SIGNER_NAME
-                value: clusterissuers.cert-manager.io/istio-system
+                value: tcsclusterissuer.tcs.intel.com/sgx-signer
               - name: CERT_SIGNER_DOMAIN
-                value: clusterissuers.cert-manager.io
+                value: tcsclusterissuer.tcs.intel.com
               - name: EXTERNAL_CA
                 value: ISTIOD_RA_KUBERNETES_API
               - name: PILOT_CERT_PROVIDER
-                value: k8s.io/clusterissuers.cert-manager.io/istio-system
+                value: k8s.io/tcsclusterissuer.tcs.intel.com/sgx-signer
             volumes:
             - emptyDir:
               name: workload-socket

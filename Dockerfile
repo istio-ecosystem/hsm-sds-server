@@ -16,17 +16,16 @@
 # Build the SDS server image
 
 # Build the manager binary
-FROM ubuntu:22.04 as builder
+FROM ubuntu:20.04 as builder
 
-ARG SDK_VERSION="2.18.100.3"
+ARG SDK_VERSION="2.17.100.3"
 ARG SGX_SDK_INSTALLER=sgx_linux_x64_sdk_${SDK_VERSION}.bin
 ENV DEBIAN_FRONTEND=noninteractive
-ARG DCAP_VERSION="1.15.100.3"
+ARG DCAP_VERSION="1.14.100.3"
 # SGX prerequisites
 # hadolint ignore=DL3005,DL3008
-RUN apt-get update -y \
-  && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \ 
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+RUN apt-get update \
+  && apt-get install --no-install-recommends -y \
     ca-certificates \
     curl \
     wget \
@@ -37,33 +36,33 @@ RUN apt-get update -y \
     patchelf \ 
     git \
     gnupg \
-    && update-ca-certificates \ 
+  && update-ca-certificates \ 
   # Add 01.org to apt for SGX packages
   # hadolint ignore=DL4006
-  && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu jammy main" >> /etc/apt/sources.list.d/intel-sgx.list \
+  && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main" >> /etc/apt/sources.list.d/intel-sgx.list \
   && wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - \
   # Install SGX PSW
   && apt-get update \
   && apt-get install --no-install-recommends -y \
-    libsgx-enclave-common=${SDK_VERSION}-jammy1 \
-    libsgx-launch=${SDK_VERSION}-jammy1 \
-    libsgx-launch-dev=${SDK_VERSION}-jammy1 \
-    libsgx-epid=${SDK_VERSION}-jammy1 \
-    libsgx-epid-dev=${SDK_VERSION}-jammy1 \
-    libsgx-quote-ex=${SDK_VERSION}-jammy1 \
-    libsgx-quote-ex-dev=${SDK_VERSION}-jammy1 \
-    libsgx-urts=${SDK_VERSION}-jammy1 \
-    libsgx-uae-service=${SDK_VERSION}-jammy1 \
-    libsgx-ae-epid=${SDK_VERSION}-jammy1 \
-    libsgx-ae-le=${SDK_VERSION}-jammy1 \
-    libsgx-ae-pce=${SDK_VERSION}-jammy1 \
-    libsgx-ae-qe3=${DCAP_VERSION}-jammy1 \
-    libsgx-ae-qve=${DCAP_VERSION}-jammy1 \
-    libsgx-dcap-ql=${DCAP_VERSION}-jammy1 \
-    libsgx-dcap-ql-dev=${DCAP_VERSION}-jammy1 \
-    libsgx-pce-logic=${DCAP_VERSION}-jammy1 \
-    libsgx-qe3-logic=${DCAP_VERSION}-jammy1 \
-    libsgx-dcap-default-qpl=${DCAP_VERSION}-jammy1 \
+    libsgx-enclave-common=${SDK_VERSION}-focal1 \
+    libsgx-launch=${SDK_VERSION}-focal1 \
+    libsgx-launch-dev=${SDK_VERSION}-focal1 \
+    libsgx-epid=${SDK_VERSION}-focal1 \
+    libsgx-epid-dev=${SDK_VERSION}-focal1 \
+    libsgx-quote-ex=${SDK_VERSION}-focal1 \
+    libsgx-quote-ex-dev=${SDK_VERSION}-focal1 \
+    libsgx-urts=${SDK_VERSION}-focal1 \
+    libsgx-uae-service=${SDK_VERSION}-focal1 \
+    libsgx-ae-epid=${SDK_VERSION}-focal1 \
+    libsgx-ae-le=${SDK_VERSION}-focal1 \
+    libsgx-ae-pce=${SDK_VERSION}-focal1 \
+    libsgx-ae-qe3=${DCAP_VERSION}-focal1 \
+    libsgx-ae-qve=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-ql=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-ql-dev=${DCAP_VERSION}-focal1 \
+    libsgx-pce-logic=${DCAP_VERSION}-focal1 \
+    libsgx-qe3-logic=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-default-qpl=${DCAP_VERSION}-focal1 \
   && apt-get clean \
   && ln -s /usr/lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 /usr/lib/x86_64-linux-gnu/libsgx_enclave_common.so
 
@@ -72,7 +71,7 @@ WORKDIR /opt/intel
 
 # Install SGX SDK
 # hadolint ignore=DL4006
-RUN wget https://download.01.org/intel-sgx/sgx-linux/2.18/distro/ubuntu22.04-server/$SGX_SDK_INSTALLER \
+RUN wget https://download.01.org/intel-sgx/sgx-linux/2.17/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
   && chmod +x  $SGX_SDK_INSTALLER \
   && echo "yes" | ./$SGX_SDK_INSTALLER \
   && rm $SGX_SDK_INSTALLER \
@@ -83,19 +82,12 @@ ARG CTK_TAG="master"
 
 # Intel crypto-api-toolkit prerequisites
 #https://github.com/intel/crypto-api-toolkit#software-requirements
-RUN set -x && apt-get update -y \
-  && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \ 
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+RUN set -x && apt-get update \
   && apt-get install --no-install-recommends -y \
-    dkms \
-    libprotobuf23 \
-    autoconf \
-    autotools-dev \
-    libc6-dev \
-    libtool \
-    build-essential \
-    opensc \
-    sudo \
+    dkms libprotobuf17 autoconf \
+    autotools-dev libc6-dev \
+    libtool build-essential \
+    opensc sudo \
     automake \
   && apt-get clean \
   && git clone https://github.com/intel/crypto-api-toolkit.git \
@@ -118,30 +110,30 @@ RUN mkdir -p /usr/local/share/package-licenses \
 # Clean runtime image which supposed to
 # contain all runtime dependecy packages
 ###
-FROM ubuntu:22.04 as runtime
+FROM ubuntu:focal as runtime
 
-ARG SDK_VERSION="2.18.100.3"
-ARG DCAP_VERSION="1.15.100.3"
+ARG SDK_VERSION="2.17.100.3"
+ARG DCAP_VERSION="1.14.100.3"
 
-RUN apt-get update -y \
+RUN apt-get update \
   && apt-get install -y wget gnupg \
-  && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu jammy main" >> /etc/apt/sources.list.d/intel-sgx.list \
+  && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main" >> /etc/apt/sources.list.d/intel-sgx.list \
   && wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - \
   && sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
   && apt-get update \
   && apt-get remove -y wget gnupg && apt-get autoremove -y \
   && bash -c 'set -o pipefail; apt-get install --no-install-recommends -y \
-    libprotobuf23 \
-    libsgx-enclave-common=${SDK_VERSION}-jammy1 \
-    libsgx-epid=${SDK_VERSION}-jammy1 \
-    libsgx-quote-ex=${SDK_VERSION}-jammy1 \
-    libsgx-urts=${SDK_VERSION}-jammy1 \
-    libsgx-ae-epid=${SDK_VERSION}-jammy1 \
-    libsgx-ae-qe3=${DCAP_VERSION}-jammy1 \
-    libsgx-dcap-ql=${DCAP_VERSION}-jammy1 \
-    libsgx-pce-logic=${DCAP_VERSION}-jammy1 \
-    libsgx-qe3-logic=${DCAP_VERSION}-jammy1 \
-    libsgx-dcap-default-qpl=${DCAP_VERSION}-jammy1 \
+    libprotobuf17 \
+    libsgx-enclave-common=${SDK_VERSION}-focal1 \
+    libsgx-epid=${SDK_VERSION}-focal1 \
+    libsgx-quote-ex=${SDK_VERSION}-focal1 \
+    libsgx-urts=${SDK_VERSION}-focal1 \
+    libsgx-ae-epid=${SDK_VERSION}-focal1 \
+    libsgx-ae-qe3=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-ql=${DCAP_VERSION}-focal1 \
+    libsgx-pce-logic=${DCAP_VERSION}-focal1 \
+    libsgx-qe3-logic=${DCAP_VERSION}-focal1 \
+    libsgx-dcap-default-qpl=${DCAP_VERSION}-focal1 \
     libsofthsm2 \
     # required for pkcs11-tool
     opensc | tee --append /usr/local/share/package-install.log' \
@@ -154,7 +146,7 @@ RUN apt-get update -y \
 #  the runtime GPL packages.
 ###
 
-FROM ubuntu:22.04 as sources
+FROM ubuntu:focal as sources
 COPY --from=runtime /usr/local/share/package-install.log /usr/local/share/package-install.log
 COPY --from=runtime /usr/share/doc /tmp/runtime-doc
 RUN sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
@@ -172,7 +164,12 @@ RUN sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
           if matches=$(grep -w -e MPL -e GPL -e LGPL /tmp/runtime-doc/$pkg/copyright); then \
              echo "INFO: downloading source of $pkg because of the following licenses:"; \
              echo "$matches" | sed -e 's/^/    /'; \
-             apt-get source --download-only $pkg=$version || exit 1; \
+            # temperory fix: Remove exit 1
+            # error occured because run: apt-get source --download-only libsqlite3-0=3.31.1-4ubuntu0.3 
+            # since get the version 3.31.1-4ubuntu0.3 in package-install.log
+            # but ubuntu updated debain pkg to 3.31.1-4ubuntu0.4
+            # https://packages.ubuntu.com/search?keywords=libsqlite3-0
+             apt-get source --download-only $pkg=$version; \
           else \
              echo "INFO: not downloading source of $pkg, found no copyleft license"; \
           fi; \

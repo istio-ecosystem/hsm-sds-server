@@ -1,75 +1,41 @@
-# HSM-SDS-Server
 
-## Introduction
-
-The HSM SDS Server follows the SDS extension standard of Envoy and implements an external SDS server via more secure solution which is known as Hardware Security Module(HSM). By using this repo, User can maintain the credentials for workloads managed by Istio/Envoy in more secure scenario via external SDS server Besides supporting management for new credentials, it also allows user to upload existing credentials and manages them in higher security level. This external SDS server can be used for both gateways and workload sidecars to provide their credential information.
-
-This HSM SDS Server protects service mesh data plane private keys with Intel® SGX. The private keys are stored and used inside the SGX enclave(s) and will never stored in clear anywhere in the system. Authorized applications use the private key in the enclave by key-handle provided by SGX.
-
-## Architecture Overview
-
-<img src="diagrams/sds-server-arch-overview.png">
-
-The SDS Server can protect the private keys via SGX in 2 scenarios: workloads and gateways in Istio/Envoy, showing as above.
+This document demonstrates how to integrate hsm-sds-server with TCS.
 
 ## Prerequisites
 
-Prerequisites for using Istio mTLS private key protection with SGX:
+Prerequisites for using Istio private key protection with SGX:
 
 - Kubernetes cluster with one or more nodes with [Intel® SGX](https://software.intel.com/content/www/us/en/develop/topics/software-guard-extensions.html) supported hardware
 - [Intel® SGX device plugin for Kubernetes](https://github.com/intel/intel-device-plugins-for-kubernetes/blob/main/cmd/sgx_plugin/README.md)
 - Linux kernel version 5.11 or later on the host (in tree SGX driver)
-- Custom CA which support [Kubernetes CSR API](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)
+- [trusted-certificate-issuer](https://github.com/intel/trusted-certificate-issuer) (Optional, other Issuers can also be used like cert-manager)
 - [Intel® SGX AESM daemon](https://github.com/intel/linux-sgx#install-the-intelr-sgx-psw) (Optional)
 - [Intel® KMRA service](https://www.intel.com/content/www/us/en/developer/topic-technology/open/key-management-reference-application/overview.html) (Optional)
 - [Intel® Linux SGX](https://github.com/intel/linux-sgx) and [cripto-api-toolkit](https://github.com/intel/crypto-api-toolkit) in the host (optional, only needed if you want to build sds-server image locally)
-> NOTE: The KMRA service and AESM daemon are also optional, need to be set up only when remote attestation required, which can be set through `NEED_QUOTE` flag in the chart.
+> NOTE: The KMRA service and AESM daemon are also optional, need to be set up only when workload remote attestation required, which can be set through `NEED_QUOTE` flag in the chart.
 
 ## Getting started
 
-This section covers how to install Istio mTLS and gateway private keys protection with SGX. We use Cert Manager as default K8s CA in this document. If you want to use TCS for workload remote attestaion, please refer to this [Document](Install-with-TCS.md).
-
-> Note: please ensure installed cert manager with flag  `--feature-gates=ExperimentalCertificateSigningRequestControllers=true`. You can use `--set featureGates="ExperimentalCertificateSigningRequestControllers=true"` when helm install cert-manager
-
+This section covers how to install Istio mTLS and gateway private keys protection with SGX
 ### Create signer
 
 ```sh
-$ cat <<EOF > ./istio-cm-issuer.yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
+$ export CA_SIGNER_NAME=sgx-signer
+$ cat << EOF | kubectl create -f -
+apiVersion: tcs.intel.com/v1alpha1
+kind: TCSClusterIssuer
 metadata:
-  name: selfsigned-istio-issuer
+    name: $CA_SIGNER_NAME
 spec:
-  selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: istio-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  commonName: istio-system
-  secretName: istio-ca-selfsigned
-  issuerRef:
-    name: selfsigned-istio-issuer
-    kind: ClusterIssuer
-    group: cert-manager.io
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: istio-system
-spec:
-  ca:
-    secretName: istio-ca-selfsigned
+    secretName: ${CA_SIGNER_NAME}-secret
+    # If using quoteattestaion, set selfSign as false
+    # selfSign: false
 EOF
-$ kubectl apply -f ./istio-cm-issuer.yaml
 ```
 
 ```sh
 # Get CA Cert and replace it in ./deployment/istio-configs/istio-hsm-config.yaml
-$ kubectl get clusterissuers istio-system -o jsonpath='{.spec.ca.secretName}' | xargs kubectl get secret -n cert-manager -o jsonpath='{.data.ca\.crt}' | base64 -d
+$ kubectl get secret -n tcs-issuer ${CA_SIGNER_NAME}-secret -o jsonpath='{.data.tls\.crt}' |base64 -d | sed -e 's;\(.*\);        \1;g'
 ```
 
 ### Apply quote attestation CRD
@@ -86,8 +52,12 @@ $ make docker
 1. Install Istio
 
 ```sh
-$ istioctl install -f ./deployment/istio-configs/istio-hsm-config.yaml -y
+$ istioctl install -f ./deployment/integration-tcs/istio-tcs-mTLS.yaml -y
 ```
+
+> NOTE: You can also customize the `istio-tcs-mTLS.yaml` according to your needs. If you want do the workload quote verification, you should set the `NEED_QUOTE` env as `true`. And if you are using the TCS v1alpha1 api, you can set the `RANDOM_NONCE` as `false`.
+
+
 
 2. Verifiy the Istio is ready
 
@@ -140,14 +110,14 @@ It can be seen from the config file that the `private_key_provider` configuation
 1. Install Istio
 
 > NOTE: for the below command you need to use the `istioctl` for the `docker.io/intel/istioctl:1.16.1-intel.0` since only that contains Istio manifest enhancements for SGX mTLS.
-You can also customize the `intel-istio-sgx-gateway.yaml`.
+You can also customize the `istio-tcs-gateway.yaml` according to your needs. If you want do the workload quote verification, you can set the `NEED_QUOTE` env as `true`. And if you are using the TCS v1alpha1 api, you should set the `RANDOM_NONCE` as `false`.
 
 ```sh
-istioctl install -f ./deployment/istio-configs/gateway-istio-hsm.yaml -y
+istioctl install -f ./deployment/integration-tcs/istio-tcs-gateway -y
 ```
 Note: please execute `kubectl apply -f deployment/istio-configs/gateway-clusterrole.yaml` to make sure that the ingress gateway has enough privilege.
 
-1. Verifiy the pods are running
+2. Verifiy the pods are running
 
 By deault, `Istio` will be installed in the `istio-system` namespce
 

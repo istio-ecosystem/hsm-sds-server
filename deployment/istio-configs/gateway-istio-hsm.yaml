@@ -11,13 +11,13 @@ spec:
       k8s:
         env:
           - name: CERT_SIGNER_NAME
-            value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
+            value: clusterissuers.cert-manager.io/istio-system
           - name: CERT_SIGNER_DOMAIN
-            value: tcsissuer.tcs.intel.com
+            value: clusterissuers.cert-manager.io
           - name: EXTERNAL_CA
             value: ISTIOD_RA_KUBERNETES_API
           - name: PILOT_CERT_PROVIDER
-            value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
+            value: k8s.io/clusterissuers.cert-manager.io/istio-system
         overlays:
           - kind: ClusterRole
             name: istiod-clusterrole-istio-system
@@ -27,7 +27,7 @@ spec:
                   apiGroups:
                   - certificates.k8s.io
                   resourceNames:
-                  - tcsissuer.tcs.intel.com/*
+                  - clusterissuers.cert-manager.io/istio-system
                   resources:
                   - signers
                   verbs:
@@ -42,36 +42,29 @@ spec:
     defaultConfig:
       proxyMetadata:
         PROXY_CONFIG_XDS_AGENT: "true"
-        ISTIO_META_CERT_SIGNER: sandbox.sgx-ca
+        ISTIO_META_CERT_SIGNER: istio-system
     caCertificates:
       - pem: |
           -----BEGIN CERTIFICATE-----
-          MIIENTCCAp2gAwIBAgIUVfQ4RSxk7R97f2LMWoZZNZM864EwDQYJKoZIhvcNAQEL
-          BQAwKjEPMA0GA1UECgwGSW50ZWwsMRcwFQYDVQQDDA5zYW5kYm94LnNneC1jYTAe
-          Fw0yMjExMTQxMTA1NDJaFw0zMjExMTExMTA1NDJaMCoxDzANBgNVBAoMBkludGVs
-          LDEXMBUGA1UEAwwOc2FuZGJveC5zZ3gtY2EwggGiMA0GCSqGSIb3DQEBAQUAA4IB
-          jwAwggGKAoIBgQCo3rpAn8ohzbOrtj0R1LnOhR8eeemru86aW+cKv9B94dK/Pj/L
-          m9zYS26lUPTCLvXivAPUSU5FXJj39/59RaAmQcSAtKCFd2cPVojxzpHEoc57gqYs
-          MftpJNhAadZb4UH1KMjVzPSdu7Od50BRDCHGS6cNEGEuPuXWZLi1KpBjyK6+DPqE
-          xmpQ+mNop+l0L34CvqwBOxRVSCbmAAkHnwaG3DkLkT+XMlJq7k6Z4HB0ay7u0cnf
-          6gYhmQ8n2MlAI/wekfPdPyiQiQzp+F4AweRDKDDEOFwWv5RDA2bXecJl1wXk4sFw
-          r9e7D3grGWF7vmaVybICsb+yyK2if2NMINthr25pVsV5x014rlP2MPMO3bdPKQeB
-          eFtPGPzBsf4zpWqbyaUzGVeBRKmirrhrX/tr0dssY2cBCg+cWoR9Ey33oDFa3dCk
-          hU1y8ZOzxRBdgxvQmMNkdGIckwVmmU+Wa54JB5YQ4w4tPXzPahvON6cUMALKs3hS
-          4t6Ydv1G/cCtCfECAwEAAaNTMFEwHQYDVR0OBBYEFOTaW9o4X2wKnjbQziQJ9qzA
-          2eMaMB8GA1UdIwQYMBaAFOTaW9o4X2wKnjbQziQJ9qzA2eMaMA8GA1UdEwEB/wQF
-          MAMBAf8wDQYJKoZIhvcNAQELBQADggGBADsqvg1UGH+DbBMgppn1KYv/vW82aJzC
-          mJD7ZcG99Z1OFM8704O44RcP41ZtxCOK2nk/9GcVBP1+lNoLKw/O1zONe3o8STPH
-          o57hkKfe/l631y0ag3csGQsqxxLzf5CqSTYBzbDgyrpxSZs00iynpVxBpLgPVhtG
-          HnpDPW5jzH/YATtehR3dsmcCge2FN+aRM/Ms+klrHbwXT/qS5ZcW1O2hE4OxKoqY
-          XJ4oLCat+48AdC9RtaQ75tyjKXF68KXg0ok4smBKm5Wt/raiL1Q9tHNxfP3AbLjM
-          i0KpXxxP8OQ+sgFJL2wmOfincjGuKGsXRIFae5Sh57DRNu+PApW5XwP/bVq8cHcv
-          zx87cFPJu2+aEE5Q6AfweO9XOnEWzPz0APIqk5sR8eOAmM6zIbRTneG4X/qiB2Hl
-          SPc04Xjxw/KKzIz1J5fv7QtP38Ja2SquQok3OLKCgizkS7mIlP2vW26ZioAVwjZt
-          PNspr3McA8ifPB9+FE7fm3qHORl0THKTKw==
+          MIIC+zCCAeOgAwIBAgIRAKcR4nvW8Usu7rhcUr/UUUgwDQYJKoZIhvcNAQELBQAw
+          FzEVMBMGA1UEAxMMaXN0aW8tc3lzdGVtMB4XDTIzMDIyNzA4MjcwNloXDTIzMDUy
+          ODA4MjcwNlowFzEVMBMGA1UEAxMMaXN0aW8tc3lzdGVtMIIBIjANBgkqhkiG9w0B
+          AQEFAAOCAQ8AMIIBCgKCAQEAzBcy7Vp6OkCeIFThY+MBRJtOiEYOdinz1CGV3cNc
+          QYVpETQQiNWSo/ugKZ+RP5qvcoY5LtkoDnCYympamEOfx5i0cO0EsuGEEigJ5XPL
+          TnaaGc/4RiQhIE9LMAsFDxR4S9STbtL4F42OXOKZ3/TUDxrNyQgadhJ3Z2JQP5nk
+          1mZBVivdeo3VXCFyomnBmZ/+VyRe+FKNz2LVuLLcNyRILt5MIwNqOYX0uQJf39qM
+          BYFbpuSCAzIK5Bxcul6+hpanKyrLgcpv7O3xHfwsLksMq1bC99/+kAzFfFiZ2x40
+          1QGJ+je2LiSbrvtYGOmxgHLqfuVAuZbjZMWQMlP64m4xxQIDAQABo0IwQDAOBgNV
+          HQ8BAf8EBAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUQmd5eA3CVRVH
+          S+NUEjNR9Z/GqsUwDQYJKoZIhvcNAQELBQADggEBAKwi4fewRoyqQ8F/xrVNp3YM
+          U7rQcyvJrImECEsWupEA+Z0WjOMJ73VvzUvkfT1UiDhIwMoorwWx6EY9LIB6F/X/
+          tgXPl6Wnnv8oQ65Pgiwe6EWd3CLZn5GUmHp9+X1qISb3PlaAu0nsDTiNLuo0icCv
+          TR6Z7SWLTTCDFvcCnDDIt9uaAXqZAyO0AK7CyP/n6xtkntE0dtHPrHNGDr+9ptpK
+          cBg0gSffS0q2RQ0cr199kTrnAhCBunFFygQz6KcOPyTn9jt48l6e7GczF2Y1Tajm
+          59N7mraLaM3QyH4HeYGmMmAG0xpIm0wIWqLu+iAHhT2yBYxlrIMCV1yzNSfKNwo=
           -----END CERTIFICATE-----
         certSigners:
-        - tcsissuer.tcs.intel.com/sandbox.sgx-ca
+        - clusterissuers.cert-manager.io/istio-system
   values:
     global:
       imagePullPolicy: IfNotPresent 
@@ -123,13 +116,13 @@ spec:
                 value: "{{ . }}"
               {{- end }}
               - name: CERT_SIGNER_NAME
-                value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
+                value: clusterissuers.cert-manager.io/istio-system
               - name: CERT_SIGNER_DOMAIN
-                value: tcsissuer.tcs.intel.com
+                value: clusterissuers.cert-manager.io
               - name: EXTERNAL_CA
                 value: ISTIOD_RA_KUBERNETES_API
               - name: PILOT_CERT_PROVIDER
-                value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
+                value: k8s.io/clusterissuers.cert-manager.io/istio-system
               volumeMounts:
               - name: workload-socket
                 mountPath: /var/run/secrets/workload-spiffe-uds
@@ -164,13 +157,13 @@ spec:
                   sgx.intel.com/epc: 1Mi
               env:
               - name: CERT_SIGNER_NAME
-                value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
+                value: clusterissuers.cert-manager.io/istio-system
               - name: CERT_SIGNER_DOMAIN
-                value: tcsissuer.tcs.intel.com
+                value: clusterissuers.cert-manager.io
               - name: EXTERNAL_CA
                 value: ISTIOD_RA_KUBERNETES_API
               - name: PILOT_CERT_PROVIDER
-                value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
+                value: k8s.io/clusterissuers.cert-manager.io/istio-system
             volumes:
             - emptyDir:
               name: workload-socket
@@ -186,7 +179,7 @@ spec:
           sgx.intel.com/quote-provider: aesmd
         additionalContainers:
           - name: sdsserver
-            image: sds-server/sds-server:latest 
+            image: sds-server/sds-server:latest
             imagePullPolicy: IfNotPresent 
             lifecycle:
               postStart:
@@ -217,19 +210,19 @@ spec:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
             - name: MANUAL_OPS 
-              value: "false"
+              value: "true"
             - name: NEED_QUOTE
               value: "false"
             - name: RANDOM_NONCE
               value: "false"
             - name: CERT_SIGNER_NAME
-              value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
+              value: clusterissuers.cert-manager.io/istio-system
             - name: CERT_SIGNER_DOMAIN
-              value: tcsissuer.tcs.intel.com
+              value: clusterissuers.cert-manager.io
             - name: EXTERNAL_CA
               value: ISTIOD_RA_KUBERNETES_API
             - name: PILOT_CERT_PROVIDER
-              value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
+              value: k8s.io/clusterissuers.cert-manager.io/istio-system
             volumeMounts:
             - name: workload-socket
               mountPath: /var/run/secrets/workload-spiffe-uds
