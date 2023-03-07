@@ -165,7 +165,7 @@ Create httpbin deployment with gateway CR:
 > NOTE: If you want to use the sds-custom injection template, you need to set the annotations `inject.istio.io/templates` for both `sidecar` and `sgx`. And the ClusterRole is also required.
 ```sh
 kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/httpbin-hsm.yaml )
-kubectl apply -f <(istioctl kube-inject -f ./deployment/istio-configs/httpbin-gateway.yaml )
+kubectl apply -f ./deployment/istio-configs/httpbin-gateway.yaml
 ```
 
 > A reminder, if you want to apply other workloads, please make sure to add the correct RBAC rules for its `Service Account`. For details, please refer to the configuration of `ClusterRole` in `./deployment/istio-configs/httpbin-hsm.yaml`.
