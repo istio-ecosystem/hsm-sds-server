@@ -19,11 +19,11 @@ Prerequisites for using Istio mTLS private key protection with SGX:
 - Kubernetes cluster with one or more nodes with [Intel® SGX](https://software.intel.com/content/www/us/en/develop/topics/software-guard-extensions.html) supported hardware
 - [Intel® SGX device plugin for Kubernetes](https://github.com/intel/intel-device-plugins-for-kubernetes/blob/main/cmd/sgx_plugin/README.md)
 - Linux kernel version 5.11 or later on the host (in tree SGX driver)
-- [trusted-certificate-issuer](https://github.com/intel/trusted-certificate-issuer)
+- [trusted-certificate-issuer](https://github.com/intel/trusted-certificate-issuer) (Optional, other Issuers can also be used like cert-manager)
 - [Intel® SGX AESM daemon](https://github.com/intel/linux-sgx#install-the-intelr-sgx-psw)
 - [Intel® KMRA service](https://www.intel.com/content/www/us/en/developer/topic-technology/open/key-management-reference-application/overview.html)
 - [Intel® Linux SGX](https://github.com/intel/linux-sgx) and [cripto-api-toolkit](https://github.com/intel/crypto-api-toolkit) in the host (optional, only needed if you want to build sds-server image locally)
-> NOTE: The KMRA service and AESM daemon is also optional, needs to be set up only when remote attestaion required, which can be set through `NEED_QUOTE` flag in the chart.
+> NOTE: The KMRA service and AESM daemon are also optional, need to be set up only when remote attestation required, which can be set through `NEED_QUOTE` flag in the chart.
 
 ## Getting started
 
