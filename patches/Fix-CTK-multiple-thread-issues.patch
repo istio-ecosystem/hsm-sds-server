@@ -1,0 +1,70 @@
+diff --git a/src/p11/enclave_config/p11Enclave.config.xml b/src/p11/enclave_config/p11Enclave.config.xml
+index 91bd466..40b3359 100644
+--- a/src/p11/enclave_config/p11Enclave.config.xml
++++ b/src/p11/enclave_config/p11Enclave.config.xml
+@@ -32,8 +32,8 @@
+   <ProdID>0</ProdID>
+   <ISVSVN>1</ISVSVN>
+   <StackMaxSize>0x40000</StackMaxSize>
+-  <HeapMaxSize>0xA00000</HeapMaxSize>
+-  <TCSNum>1</TCSNum>
++  <HeapMaxSize>0xA000000</HeapMaxSize>
++  <TCSNum>100</TCSNum>
+   <TCSPolicy>1</TCSPolicy>
+   <DisableDebug>0</DisableDebug>
+   <MiscSelect>0</MiscSelect>
+diff --git a/src/p11/trusted/SoftHSMv2/common/osmutex.cpp b/src/p11/trusted/SoftHSMv2/common/osmutex.cpp
+index 0ef76d3..a0a2ddc 100644
+--- a/src/p11/trusted/SoftHSMv2/common/osmutex.cpp
++++ b/src/p11/trusted/SoftHSMv2/common/osmutex.cpp
+@@ -273,26 +273,28 @@ CK_RV OSUnlockMutex(CK_VOID_PTR mutex)
+ #error "There are no mutex implementations for your operating system yet"
+ #endif
+ #else
+-#include <mutex>
++#include "sgx_spinlock.h"
+ 
+ CK_RV OSCreateMutex(CK_VOID_PTR_PTR newMutex)
+ {
+ 	/* Allocate memory */
+-    std::mutex *mtx = new std::mutex;
++    sgx_spinlock_t *mtx = new sgx_spinlock_t;
+ 
+ 	if (!mtx)
+ 	{
+ 		return CKR_HOST_MEMORY;
+ 	}
+ 
+-	*newMutex = mtx;
++    *mtx = SGX_SPINLOCK_INITIALIZER;
++
++    *newMutex = reinterpret_cast<void*>(const_cast<uint32_t*>(mtx));
+ 
+ 	return CKR_OK;
+ }
+ 
+ CK_RV OSDestroyMutex(CK_VOID_PTR inMutex)
+ {
+-    delete reinterpret_cast<std::mutex*>(inMutex);
++    delete reinterpret_cast<sgx_spinlock_t*>(inMutex);
+ 	return CKR_OK;
+ }
+ 
+@@ -303,7 +305,7 @@ CK_RV OSLockMutex(CK_VOID_PTR inMutex)
+ 		return CKR_ARGUMENTS_BAD;
+ 	}
+ 
+-    reinterpret_cast<std::mutex*>(inMutex)->lock();
++    sgx_spin_lock(reinterpret_cast<sgx_spinlock_t*>(inMutex));
+ 
+ 	return CKR_OK;
+ }
+@@ -315,7 +317,7 @@ CK_RV OSUnlockMutex(CK_VOID_PTR inMutex)
+ 		return CKR_ARGUMENTS_BAD;
+ 	}
+ 
+-    reinterpret_cast<std::mutex*>(inMutex)->unlock();
++    sgx_spin_unlock(reinterpret_cast<sgx_spinlock_t*>(inMutex));
+ 
+ 	return CKR_OK;
+ }

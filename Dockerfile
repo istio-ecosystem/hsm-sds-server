@@ -80,6 +80,9 @@ RUN wget https://download.01.org/intel-sgx/sgx-linux/2.17/distro/ubuntu20.04-ser
 # Tag/commit-id/branch to use for bulding CTK
 ARG CTK_TAG="master"
 
+# Copy CTK patch
+ADD patches/Fix-CTK-multiple-thread-issues.patch /tmp/
+
 # Intel crypto-api-toolkit prerequisites
 #https://github.com/intel/crypto-api-toolkit#software-requirements
 RUN set -x && apt-get update \
@@ -93,6 +96,7 @@ RUN set -x && apt-get update \
   && git clone https://github.com/intel/crypto-api-toolkit.git \
   && cd /opt/intel/crypto-api-toolkit \
   && git checkout ${CTK_TAG} -b v${CTK_TAG} \
+  && git apply /tmp/Fix-CTK-multiple-thread-issues.patch \
   # disable building tests
   && sed -i -e 's;test;;g' ./src/Makefile.am \
   # disable enclave signing inside CTK
