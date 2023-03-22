@@ -14,8 +14,6 @@ spec:
             value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
           - name: CERT_SIGNER_DOMAIN
             value: tcsissuer.tcs.intel.com
-          - name: EXTERNAL_CA
-            value: ISTIOD_RA_KUBERNETES_API
           - name: PILOT_CERT_PROVIDER
             value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
         overlays:
@@ -73,6 +71,9 @@ spec:
         certSigners:
         - tcsissuer.tcs.intel.com/sandbox.sgx-ca
   values:
+    pilot:
+      env:
+        EXTERNAL_CA: ISTIOD_RA_KUBERNETES_API
     global:
       imagePullPolicy: IfNotPresent 
     sidecarInjectorWebhook:
@@ -126,8 +127,8 @@ spec:
                 value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
               - name: CERT_SIGNER_DOMAIN
                 value: tcsissuer.tcs.intel.com
-              - name: EXTERNAL_CA
-                value: ISTIOD_RA_KUBERNETES_API
+              # - name: EXTERNAL_CA
+              #   value: ISTIOD_RA_KUBERNETES_API
               - name: PILOT_CERT_PROVIDER
                 value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
               volumeMounts:
@@ -167,8 +168,8 @@ spec:
                 value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
               - name: CERT_SIGNER_DOMAIN
                 value: tcsissuer.tcs.intel.com
-              - name: EXTERNAL_CA
-                value: ISTIOD_RA_KUBERNETES_API
+              # - name: EXTERNAL_CA
+              #   value: ISTIOD_RA_KUBERNETES_API
               - name: PILOT_CERT_PROVIDER
                 value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
             volumes:
@@ -226,8 +227,8 @@ spec:
               value: tcsissuer.tcs.intel.com/sandbox.sgx-ca
             - name: CERT_SIGNER_DOMAIN
               value: tcsissuer.tcs.intel.com
-            - name: EXTERNAL_CA
-              value: ISTIOD_RA_KUBERNETES_API
+            # - name: EXTERNAL_CA
+            #   value: ISTIOD_RA_KUBERNETES_API
             - name: PILOT_CERT_PROVIDER
               value: k8s.io/tcsissuer.tcs.intel.com/sandbox.sgx-ca
             volumeMounts:
