@@ -367,7 +367,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 
 	}
 
-	log.Info("SDS Resp: ", resp)
+	// log.Info("SDS Resp: ", resp)
 	return resp, nil
 }
 
@@ -432,7 +432,7 @@ func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.Discov
 		}
 	}
 	log.Infof("workload certificate updated successfully.")
-	log.Info("Rotate resp: ", resp)
+	// log.Info("Rotate resp: ", resp)
 	return resp, nil
 }
 
