@@ -29,10 +29,10 @@ import (
 )
 
 const (
-	DefaultQuoteVersion    = "ECDSA Quote 3"
-	KMRABased              = "KMRA"
-	asRootCA               = true
-	defaultCertPrefix      = "init-cert."
+	DefaultQuoteVersion = "ECDSA Quote 3"
+	KMRABased           = "KMRA"
+	asRootCA            = true
+	defaultCertPrefix   = "init-cert."
 )
 
 type GatewayWatcher struct {
@@ -241,7 +241,7 @@ func NewGatewayWatcher(client kube.Client, sm *security.SecretManager) (*Gateway
 		}
 	} else {
 		if os.IsNotExist(err) {
-			log.Debugf("failed to read pod labels: %v", err)
+			log.Warnf("failed to read pod labels: %v", err)
 			reErr = fmt.Errorf("failed to read pod labels: %v", err)
 		} else {
 			log.Warnf("failed to read pod labels: %v", err)

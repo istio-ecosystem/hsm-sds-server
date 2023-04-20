@@ -147,10 +147,10 @@ func (q *queueImpl) processNextItem() bool {
 }
 
 func (q *queueImpl) Run(stop <-chan struct{}) {
-	log.Debugf("started queue %s", q.id)
+	log.Infof("started queue %s", q.id)
 	defer func() {
 		q.closeOnce.Do(func() {
-			log.Debugf("closed queue %s", q.id)
+			log.Infof("closed queue %s", q.id)
 			close(q.closed)
 		})
 	}()
