@@ -153,7 +153,7 @@ func readSignedCsr(client kubernetes.Interface, csrName string, watchTimeout tim
 					return reqSigned.Status.Certificate
 				}
 			case <-timer:
-				log.Debugf("timeout when watching CSR %v", csrName)
+				log.Warnf("timeout when watching CSR %v", csrName)
 				timeout = true
 			}
 			if timeout {
@@ -161,16 +161,16 @@ func readSignedCsr(client kubernetes.Interface, csrName string, watchTimeout tim
 			}
 		}
 	}
-	log.Info("DEBUG readSignedCsr finished")
+	log.Info("readSignedCsr finished")
 	return getSignedCsr(client, csrName, readInterval, maxNumRead)
 }
 
 func getSignedCsr(client kubernetes.Interface, csrName string, readInterval time.Duration, maxNumRead int) []byte {
-	log.Info("DEBUG getSignedCsr called")
+	log.Info("getSignedCsr called")
 	var err error
 	var r *certv1.CertificateSigningRequest
 	for i := 0; i < maxNumRead; i++ {
-		log.Info("DEBUG run into for{maxNumRead} to get cert")
+		log.Info("run into for{maxNumRead} to get cert")
 		r, err = client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), csrName, metav1.GetOptions{})
 		if err == nil && r.Status.Certificate != nil {
 			// Certificate is ready
@@ -193,7 +193,7 @@ func getSignedCsr(client kubernetes.Interface, csrName string, readInterval time
 		}
 		return []byte{}
 	}
-	log.Info("DEBUG getSignedCsr finished")
+	log.Info("getSignedCsr finished")
 	return []byte{}
 }
 
@@ -205,7 +205,7 @@ func cleanUpCertGen(client kubernetes.Interface, csrName string) error {
 	if err != nil {
 		log.Errorf("failed to delete CSR (%v): %v", csrName, err)
 	} else {
-		log.Debugf("deleted CSR: %v", csrName)
+		log.Infof("deleted CSR: %v", csrName)
 	}
 	log.Info("Cleaning up certificatsigingrequest")
 	return err

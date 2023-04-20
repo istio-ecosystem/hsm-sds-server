@@ -40,8 +40,8 @@ func NewServer(kubeconfig, configContext string) *Server {
 	sdsService := newSDSService(kubeconfig, configContext)
 	if sdsService != nil {
 		s = &Server{
-			stopped: atomic.NewBool(false),
-			errGatewayChan: make(chan error),
+			stopped:         atomic.NewBool(false),
+			errGatewayChan:  make(chan error),
 			errWorkloadChan: make(chan error),
 		}
 		s.workloadSds = sdsService
@@ -73,7 +73,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 	log.Info("Starting mTLS SDS grpc server")
-	log.Debugf("mTLS Listener addr: ", s.grpcWorkloadListener.Addr())
+	log.Infof("mTLS Listener addr: ", s.grpcWorkloadListener.Addr())
 	if s.grpcWorkloadListener == nil {
 		if s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath); err != nil {
 			log.Info("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
@@ -89,7 +89,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 	log.Info("Starting gateway SDS grpc server")
-	log.Debugf("gateway Listener addr: ", s.grpcGatewayListener.Addr())
+	log.Infof("gateway Listener addr: ", s.grpcGatewayListener.Addr())
 	if s.grpcGatewayListener == nil {
 		if s.grpcGatewayListener, err = uds.NewListener(security.GatewayIdentitySocketPath); err != nil {
 			log.Info("gateway SDS grpc server for gateway failed to set up UDS: ", err)

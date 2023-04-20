@@ -96,7 +96,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 
 	if sdsSvc != nil {
 		if err := sdsSvc.initSDSClient(kubeconfig, configContext); err != nil {
-			log.Info("DEBUG initSDSClient: init kube SDS client error: ", err)
+			log.Info("initSDSClient: init kube SDS client error: ", err)
 		}
 
 		// New a GateWayWatcher to watch the credential name of SDS service
@@ -121,7 +121,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		// sds server fetch the certificate from Istio configmap by default
 		caCert, err := sdsSvc.getMatchedCertificates("", "", "")
 		if err != nil {
-			log.Infof("DEBUG Handle CA certificates: %v", err)
+			log.Infof("Handle CA certificates: %v", err)
 		} else {
 			sdsSvc.st.Cache.SetRoot([]byte(caCert.GetPem()))
 		}
@@ -140,7 +140,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 }
 
 func (s *sdsservice) StreamSecrets(stream sdsv3.SecretDiscoveryService_StreamSecretsServer) error {
-	log.Info("DEBUG: StreamSecret called")
+	log.Info("StreamSecret called")
 	var err error
 	reqch := make(chan *discovery.DiscoveryRequest, 1)
 	respch := make(chan *discovery.DiscoveryResponse, 1)
@@ -302,7 +302,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				}
 			}
 		} else if ns == nil {
-			log.Infof("DEBUG: cache secret is nil, generate new certificate")
+			log.Infof("cache secret is nil, generate new certificate")
 			// cert, err = s.st.GenerateSecret(resourceName)
 			cert, err = s.GenCSRandGetCert(resourceName)
 			if err != nil {
@@ -367,7 +367,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 
 	}
 
-	log.Info("DEBUG SDS Resp: ", resp)
+	log.Info("SDS Resp: ", resp)
 	return resp, nil
 }
 
@@ -387,14 +387,14 @@ func (s *sdsservice) registerSecret(item security.SecretItem, resourceName strin
 		// Clear the cache so the next call generates a fresh certificate
 		s.st.Cache.SetWorkload(nil)
 		s.pushch <- item.ResourceName
-		log.Infof("DEBUG: Time to delay, set workload as nil")
+		log.Infof("Time to delay, set workload as nil")
 		return nil
 	}, delay)
 }
 
 // buildRotateResponse build the rotateResponse from rotateRequest in push channel
 func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.DiscoveryResponse, error) {
-	log.Infof("DEBUG: Build certificate rotation response now")
+	log.Infof("Build certificate rotation response now")
 	secret := &tlsv3.Secret{
 		Name: resourceName,
 	}
@@ -431,8 +431,8 @@ func (s *sdsservice) buildRotateResponse(resourceName string) (*discovery.Discov
 			Nonce:       nonce,
 		}
 	}
-	log.Infof("DEBUG: workload certificate updated successfully.")
-	log.Info("DEBUG Rotate resp: ", resp)
+	log.Infof("workload certificate updated successfully.")
+	log.Info("Rotate resp: ", resp)
 	return resp, nil
 }
 
@@ -547,7 +547,7 @@ func (s *sdsservice) shouldResponse(req *discovery.DiscoveryRequest) bool {
 		return false
 	}
 	if req.GetResponseNonce() == "" {
-		log.Info("DEBUG Envoy Request nonce is none, need response")
+		log.Info("Envoy Request nonce is none, need response")
 		s.st.SgxctxLock.Lock()
 		versionCounter++
 		nonce, _ = nextNonce()

@@ -250,7 +250,7 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 		ServiceAccount: ServiceAccount,
 	}
 
-	log.Info("DEBUG SPIFFE ID: ", csrHostName)
+	log.Info("SPIFFE ID: ", csrHostName)
 	options.Host = csrHostName.String()
 	if needQuoteExtension {
 		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false, ""); err != nil {

@@ -138,12 +138,12 @@ func (q Queue) processNextItem() bool {
 
 	// We got the sync signal. This is not a real event, so we exit early after signaling we are synced
 	if key == defaultSyncSignal {
-		q.log.Debugf("synced")
+		q.log.Infof("synced")
 		q.initialSync.Store(true)
 		return true
 	}
 
-	q.log.Debugf("handling update: %v", key)
+	q.log.Infof("handling update: %v", key)
 
 	// 'Done marks item as done processing' - should be called at the end of all processing
 	defer q.queue.Done(key)
