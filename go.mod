@@ -1,6 +1,6 @@
 module github.com/intel-innersource/applications.services.cloud.hsm-sds-server
 
-go 1.18
+go 1.20
 
 require (
 	github.com/ThalesIgnite/crypto11 v1.2.5

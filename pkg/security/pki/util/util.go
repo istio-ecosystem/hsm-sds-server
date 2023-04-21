@@ -61,7 +61,7 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 	// todo: replace it via reading from CSR
 	if _, err := st.CreateNewCertificate(csrPem, nil, time.Hour*24, false, x509.KeyUsageCRLSign|x509.KeyUsageCertSign|x509.KeyUsageContentCommitment,
 		[]x509.ExtKeyUsage{}); err != nil {
-		log.Info("failed to create Certificate: ", err)
+		log.Warnf("failed to create Certificate: %v", err)
 	}
 
 	go st.DelayQueue.Run(st.Stop)

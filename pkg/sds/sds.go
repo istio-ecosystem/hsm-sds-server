@@ -125,8 +125,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		} else {
 			sdsSvc.st.Cache.SetRoot([]byte(caCert.GetPem()))
 		}
-		log.Infof("Get the CA certificate: %v", caCert)
-
+		log.Info("Get the CA certificate successfully")
 		// csrWatcher, err := csrwatcher.NewK8sCSRWatcher(sdsSvc.sdsClient, sdsSvc.st)
 		// if err != nil {
 		// 	log.Errorf("error in NewK8sCSRWatcher: %v", err)
@@ -241,7 +240,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		VersionInfo: versionInfo,
 		Nonce:       nonce,
 	}
-	log.Info("Request ResourceNames: %v", req.ResourceNames)
+	log.Infof("Request ResourceNames: %v", req.ResourceNames)
 	for _, resourceName := range req.ResourceNames {
 		// TODO: Encapsulate these functions and do the following steps:
 		// Find the certificate in the secretManager cache
