@@ -1,4 +1,4 @@
-This guide shows the steps to setup SGX dependecies and software packages.
+This guide shows the steps to setup SGX dependecies and software stack.
 
 ## Prerequisites
 1. **Hardware**: Xeon Family server later than IceLake (included), enabling PRMRR size large enough in the BIOS. Because different devices have different configuration locations in BIOS, the exact configuration path cannot be provided. But the entry is typically in the "Security" section, "Advance" section or "Processor Configuration" section which is configuration path we find. 
@@ -21,7 +21,7 @@ Guard Extension
 
     •	If the kernel needs to be upgraded and has installed sgx out-of-tree driver, please use `dkms` remove the sgx driver first and then upgrade the kernel, otherwise the panic throw by dkms will prevent the new kernel from being installed correctly. Run “dkms status” to find the older driver and run “dkms remove” to remove it.
 
-## SGX Setup Procedures 
+## SGX Software Stack
 ***This guide based on Ubuntu 20.04***
 
 The Linux Intel(R) SGX software stack is comprised of the Intel(R) SGX driver, the Intel(R) SGX SDK, and the Intel(R) SGX Platform Software (PSW). The Intel(R) SGX SDK and Intel(R) SGX PSW are hosted in the [linux-sgx](https://github.com/01org/linux-sgx) project.
