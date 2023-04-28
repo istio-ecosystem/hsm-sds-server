@@ -110,6 +110,18 @@ RUN mkdir -p /usr/local/share/package-licenses \
   && cp /opt/intel/crypto-api-toolkit/LICENSE.md /usr/local/share/package-licenses/crypto-api-toolkit.LICENSE \
   && ls -l /opt/intel/
 
+WORKDIR /
+
+RUN cp /home/istio-proxy/sgx/include/* /usr/local/include/
+
+RUN wget https://golang.org/dl/go1.20.3.linux-amd64.tar.gz \
+  && tar -C /usr/local -xzf go1.20.3.linux-amd64.tar.gz \
+  && export PATH=$PATH:/usr/local/go/bin \
+  && export GOPATH=$HOME/go \
+  && export PATH=$PATH:$GOPATH/bin \
+  && git clone https://github.com/istio-ecosystem/hsm-sds-server.git \
+  && cd /hsm-sds-server \
+  && LIBRARY_PATH=/usr/local/lib go build -o sds-server main.go 
 ###
 # Clean runtime image which supposed to
 # contain all runtime dependecy packages
@@ -186,9 +198,6 @@ RUN sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
 FROM runtime as final
 
 RUN mkdir /sds
-WORKDIR /sds
-
-ADD sds-server /sds/sds-server
 
 WORKDIR /
 
@@ -198,7 +207,7 @@ ARG USER_UID=1337
 ARG USER_GID=$USER_UID
 
 RUN export DEBIAN_FRONTEND=noninteractive \
-  && apt-get update && apt-get -y install opensc \ 
+  && apt-get update && apt-get -y install opensc \
   && groupadd --gid $USER_GID $USERNAME \
   && useradd --create-home --home-dir /home/istio-proxy --uid $USER_UID --gid $USER_GID -m $USERNAME
 
@@ -212,6 +221,7 @@ RUN mkdir $SGX_TMP_LIBRARY_PATH
 
 # COPY --from=builder $LD_LIBRARY_PATH/ $LD_LIBRARY_PATH/
 COPY --from=builder /opt/intel /opt/intel
+COPY --from=builder /hsm-sds-server/sds-server /sds/sds-server
 COPY --from=builder /usr/bin/patchelf /usr/bin/patchelf
 COPY --from=builder $SGX_LIBRARY_PATH/libp11SgxEnclave.signed.so $SGX_TMP_LIBRARY_PATH/libp11SgxEnclave.signed.so
 COPY --from=builder $SGX_LIBRARY_PATH/libp11sgx.so $SGX_TMP_LIBRARY_PATH/libp11sgx.so
