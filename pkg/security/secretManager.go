@@ -20,8 +20,8 @@ import (
 	"istio.io/pkg/env"
 	"istio.io/pkg/log"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/queue"
+	"istio-ecosystem/hsm-sds-server/internal/sgx"
+	"istio-ecosystem/hsm-sds-server/pkg/queue"
 )
 
 const (

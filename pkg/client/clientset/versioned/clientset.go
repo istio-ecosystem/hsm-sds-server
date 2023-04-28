@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	tcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
+	tcsv1alpha2 "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

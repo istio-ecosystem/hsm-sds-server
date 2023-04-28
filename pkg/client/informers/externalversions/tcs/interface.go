@@ -19,8 +19,8 @@ limitations under the License.
 package tcs
 
 import (
-	internalinterfaces "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/tcs/v1alpha2"
+	internalinterfaces "istio-ecosystem/hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
+	v1alpha2 "istio-ecosystem/hsm-sds-server/pkg/client/informers/externalversions/tcs/v1alpha2"
 )
 
 // Interface provides access to each of this group's versions.

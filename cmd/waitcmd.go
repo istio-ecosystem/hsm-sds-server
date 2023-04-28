@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"istio.io/pkg/log"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
+	"istio-ecosystem/hsm-sds-server/pkg/security"
 )
 
 const (

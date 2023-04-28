@@ -9,10 +9,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
-	_ "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/util/labels"
+	"istio-ecosystem/hsm-sds-server/pkg/kube"
+	"istio-ecosystem/hsm-sds-server/pkg/kube/queue"
+	"istio-ecosystem/hsm-sds-server/pkg/security"
+	_ "istio-ecosystem/hsm-sds-server/pkg/util/labels"
 
 	_ "istio.io/client-go/pkg/listers/networking/v1alpha3"
 	"istio.io/pkg/log"

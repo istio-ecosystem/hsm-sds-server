@@ -5,9 +5,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"istio-ecosystem/hsm-sds-server/pkg/uds"
 )
 
 func TestUdsListener(t *testing.T) {

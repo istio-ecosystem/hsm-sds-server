@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/constants"
+	"istio-ecosystem/hsm-sds-server/pkg/constants"
 )
 
 func ReadPodLabels() (map[string]string, error) {
@@ -46,4 +46,3 @@ func parseDownwardAPI(i string) (map[string]string, error) {
 	}
 	return res, nil
 }
-

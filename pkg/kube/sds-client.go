@@ -33,9 +33,9 @@ import (
 	"istio.io/istio/operator/pkg/apis"
 	"istio.io/istio/pkg/kube/mcs"
 
-	tcsapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
-	tcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
-	qaapiinformer "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions"
+	tcsapi "istio-ecosystem/hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	tcsv1alpha2 "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned"
+	qaapiinformer "istio-ecosystem/hsm-sds-server/pkg/client/informers/externalversions"
 )
 
 type Client interface {
@@ -103,8 +103,8 @@ type SdsClient struct {
 	fastSync               bool
 	informerWatchesPending *atomic.Int32
 
-	qaapi            tcsv1alpha2.Interface
-	qaInformer       qaapiinformer.SharedInformerFactory
+	qaapi      tcsv1alpha2.Interface
+	qaInformer qaapiinformer.SharedInformerFactory
 }
 
 // NewSDSClient creates a Kubernetes client from the given rest config.
@@ -151,12 +151,11 @@ func newSDSClientInternal(clientFactory *clientFactory, revision string) (*SdsCl
 	}
 	c.extInformer = kubeExtInformers.NewSharedInformerFactory(c.extSet, resyncInterval)
 
-	c.qaapi , err = tcsv1alpha2.NewForConfig(c.config)
+	c.qaapi, err = tcsv1alpha2.NewForConfig(c.config)
 	if err != nil {
 		return nil, err
 	}
 	c.qaInformer = qaapiinformer.NewSharedInformerFactory(c.qaapi, resyncInterval)
-
 
 	return &c, nil
 }
@@ -210,7 +209,7 @@ func (c *SdsClient) ExtInformer() kubeExtInformers.SharedInformerFactory {
 func (c *SdsClient) QaAPIInformer() qaapiinformer.SharedInformerFactory {
 	return c.qaInformer
 }
-func (c *SdsClient) QaAPI() tcsv1alpha2.Interface{
+func (c *SdsClient) QaAPI() tcsv1alpha2.Interface {
 	return c.qaapi
 }
 

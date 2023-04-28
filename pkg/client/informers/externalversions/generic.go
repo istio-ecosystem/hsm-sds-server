@@ -21,7 +21,7 @@ package externalversions
 import (
 	"fmt"
 
-	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	v1alpha2 "istio-ecosystem/hsm-sds-server/pkg/apis/tcs/v1alpha2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )

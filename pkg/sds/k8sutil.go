@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
+	"istio-ecosystem/hsm-sds-server/internal/sgx"
+	"istio-ecosystem/hsm-sds-server/pkg/security"
 	"istio.io/pkg/log"
 	certv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"

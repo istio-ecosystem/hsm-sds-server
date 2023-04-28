@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs"
+	"istio-ecosystem/hsm-sds-server/pkg/apis/tcs"
 )
 
 // SchemeGroupVersion is group version used to register these objects

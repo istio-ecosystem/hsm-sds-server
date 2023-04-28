@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	internalinterfaces "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
+	internalinterfaces "istio-ecosystem/hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

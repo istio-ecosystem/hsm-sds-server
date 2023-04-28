@@ -13,12 +13,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	quoteapi "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
-	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
-	qalister "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/listers/tcs/v1alpha2"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/queue"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
+	quoteapi "istio-ecosystem/hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	v1alpha2 "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
+	qalister "istio-ecosystem/hsm-sds-server/pkg/client/listers/tcs/v1alpha2"
+	"istio-ecosystem/hsm-sds-server/pkg/kube"
+	"istio-ecosystem/hsm-sds-server/pkg/kube/queue"
+	"istio-ecosystem/hsm-sds-server/pkg/security"
 
 	"istio.io/pkg/log"
 )

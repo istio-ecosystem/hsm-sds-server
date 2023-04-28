@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/cmd"
+	"istio-ecosystem/hsm-sds-server/cmd"
 )
 
 func main() {

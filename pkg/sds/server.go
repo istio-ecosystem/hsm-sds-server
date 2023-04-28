@@ -10,8 +10,8 @@ import (
 	"istio.io/pkg/log"
 
 	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/uds"
+	"istio-ecosystem/hsm-sds-server/pkg/security"
+	"istio-ecosystem/hsm-sds-server/pkg/uds"
 )
 
 const (
