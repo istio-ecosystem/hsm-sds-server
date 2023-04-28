@@ -23,9 +23,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
-	internalinterfaces "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
-	tcs "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/informers/externalversions/tcs"
+	versioned "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned"
+	internalinterfaces "istio-ecosystem/hsm-sds-server/pkg/client/informers/externalversions/internalinterfaces"
+	tcs "istio-ecosystem/hsm-sds-server/pkg/client/informers/externalversions/tcs"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -8,7 +8,7 @@ package k8sutil
 import (
 	"strings"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/constants"
+	"istio-ecosystem/hsm-sds-server/pkg/constants"
 )
 
 type SignerIssuerRef struct {

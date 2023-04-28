@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned"
-	tcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
-	faketcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2/fake"
+	clientset "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned"
+	tcsv1alpha2 "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2"
+	faketcsv1alpha2 "istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned/typed/tcs/v1alpha2/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

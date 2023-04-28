@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"istio.io/pkg/log"
 
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/sds"
+	"istio-ecosystem/hsm-sds-server/pkg/sds"
 )
 
 var (

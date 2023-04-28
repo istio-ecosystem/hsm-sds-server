@@ -19,7 +19,7 @@ limitations under the License.
 package scheme
 
 import (
-	tcsv1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	tcsv1alpha2 "istio-ecosystem/hsm-sds-server/pkg/apis/tcs/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -31,14 +31,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	// sgxv3alpha "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/private_key_providers/sgx/v3alpha"
-	sgxv3alpha "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/api/sgx/v3alpha"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/internal/sgx"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/csrwatcher"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/gateway"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/kube/quoteattestation"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/security/pki/util"
+	sgxv3alpha "istio-ecosystem/hsm-sds-server/api/sgx/v3alpha"
+	"istio-ecosystem/hsm-sds-server/internal/sgx"
+	"istio-ecosystem/hsm-sds-server/pkg/kube"
+	"istio-ecosystem/hsm-sds-server/pkg/kube/csrwatcher"
+	"istio-ecosystem/hsm-sds-server/pkg/kube/gateway"
+	"istio-ecosystem/hsm-sds-server/pkg/kube/quoteattestation"
+	"istio-ecosystem/hsm-sds-server/pkg/security"
+	"istio-ecosystem/hsm-sds-server/pkg/security/pki/util"
 )
 
 const (

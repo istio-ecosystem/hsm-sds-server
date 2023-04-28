@@ -1,4 +1,4 @@
-module github.com/intel-innersource/applications.services.cloud.hsm-sds-server
+module istio-ecosystem/hsm-sds-server
 
 go 1.20
 

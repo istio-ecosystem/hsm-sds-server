@@ -21,7 +21,7 @@ package fake
 import (
 	"context"
 
-	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	v1alpha2 "istio-ecosystem/hsm-sds-server/pkg/apis/tcs/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -21,8 +21,8 @@ package v1alpha2
 import (
 	"net/http"
 
-	v1alpha2 "github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/apis/tcs/v1alpha2"
-	"github.com/intel-innersource/applications.services.cloud.hsm-sds-server/pkg/client/clientset/versioned/scheme"
+	v1alpha2 "istio-ecosystem/hsm-sds-server/pkg/apis/tcs/v1alpha2"
+	"istio-ecosystem/hsm-sds-server/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 

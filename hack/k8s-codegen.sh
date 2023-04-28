@@ -41,7 +41,7 @@ export VERB
 
 echo "+++ ${VERB} code..." >&2
 
-module_name="github.com/intel-innersource/applications.services.cloud.hsm-sds-server"
+module_name="istio-ecosystem/hsm-sds-server"
 
 # Generate deepcopy functions for all internal and external APIs
 deepcopy_inputs=(
