@@ -18,10 +18,10 @@
 # Build the manager binary
 FROM ubuntu:20.04 as builder
 
-ARG SDK_VERSION="2.17.100.3"
+ARG SDK_VERSION="2.19.100.3"
 ARG SGX_SDK_INSTALLER=sgx_linux_x64_sdk_${SDK_VERSION}.bin
 ENV DEBIAN_FRONTEND=noninteractive
-ARG DCAP_VERSION="1.14.100.3"
+ARG DCAP_VERSION="1.16.100.2"
 # SGX prerequisites
 # hadolint ignore=DL3005,DL3008
 RUN apt-get update \
@@ -71,7 +71,7 @@ WORKDIR /opt/intel
 
 # Install SGX SDK
 # hadolint ignore=DL4006
-RUN wget https://download.01.org/intel-sgx/sgx-linux/2.17/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
+RUN wget https://download.01.org/intel-sgx/sgx-linux/2.19/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
   && chmod +x  $SGX_SDK_INSTALLER \
   && echo "yes" | ./$SGX_SDK_INSTALLER \
   && rm $SGX_SDK_INSTALLER \
@@ -114,12 +114,13 @@ WORKDIR /
 
 RUN cp /home/istio-proxy/sgx/include/* /usr/local/include/
 
+COPY ../ /hsm-sds-server
+
 RUN wget https://golang.org/dl/go1.20.3.linux-amd64.tar.gz \
   && tar -C /usr/local -xzf go1.20.3.linux-amd64.tar.gz \
   && export PATH=$PATH:/usr/local/go/bin \
   && export GOPATH=$HOME/go \
   && export PATH=$PATH:$GOPATH/bin \
-  && git clone https://github.com/istio-ecosystem/hsm-sds-server.git \
   && cd /hsm-sds-server \
   && LIBRARY_PATH=/usr/local/lib go build -o sds-server main.go 
 ###
@@ -128,8 +129,8 @@ RUN wget https://golang.org/dl/go1.20.3.linux-amd64.tar.gz \
 ###
 FROM ubuntu:focal as runtime
 
-ARG SDK_VERSION="2.17.100.3"
-ARG DCAP_VERSION="1.14.100.3"
+ARG SDK_VERSION="2.19.100.3"
+ARG DCAP_VERSION="1.16.100.2"
 
 RUN apt-get update \
   && apt-get install -y wget gnupg \
