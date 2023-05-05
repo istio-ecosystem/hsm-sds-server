@@ -18,7 +18,7 @@ clean:
 	rm ${OUT}
 # Please make sure that user has enough privilege to execute docker command
 docker: 
-	docker build -t ${HUB}/${BINARY}:${TAG} .
+	docker build -t ${HUB}/${BINARY}:${TAG} -f Dockerfile .
 
 ctr: 
 	docker build -t ${HUB}/${BINARY}:${TAG} .
@@ -35,9 +35,6 @@ ifndef HUB
 endif
 ifndef TAG
   $(error Environment Variable TAG is not set)
-endif
-ifndef GOPATH
-  $(error Environment Variable GOPATH is not set)
 endif
 
 include make/k8s_codegen.mk
