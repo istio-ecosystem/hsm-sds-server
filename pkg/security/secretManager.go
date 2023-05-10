@@ -28,7 +28,6 @@ const (
 	WorkloadIdentitySocketPath = "/var/run/secrets/workload-spiffe-uds/socket"
 	GatewayIdentitySocketPath  = "/var/run/secrets/credential-uds/socket"
 	SgxLibraryPrefix           = "/home/istio-proxy/sgx/lib/"
-	DefaultRSAKeysize          = 2048
 	RootCertName               = "ROOTCA"
 	WorkloadCertName           = "default"
 	SDSCredNamePrefix          = "sds://"
@@ -197,6 +196,7 @@ var (
 	ManualOPForGateway = env.RegisterBoolVar("MANUAL_OPS", true, "Manual operation for gateway if there is no key server, true by default").Get()
 	PendingSignerName  = env.RegisterStringVar("CERT_SIGNER_NAME", "tcsclusterissuer.tcs.intel.com/sgx-signer",
 		"pendingSignerName").Get()
+	RSAKeySizeEnv                     = env.RegisterIntVar("MTLS_RSA_KEY_SIZE", 4096, "mTLS private key size, 2048, 4096, 8192 supported, by default is 4096").Get()
 	SecretRotationGracePeriodRatioEnv = env.Register("SECRET_GRACE_PERIOD_RATIO", 0.5,
 		"The grace period ratio for the cert rotation, by default 0.5.").Get()
 )

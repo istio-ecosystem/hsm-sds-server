@@ -80,7 +80,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 		IsCA:                           false,
 		TTL:                            time.Hour * 24,
 		NotBefore:                      time.Now(),
-		RSAKeySize:                     security.DefaultRSAKeysize,
+		RSAKeySize:                     security.RSAKeySizeEnv,
 		Org:                            "Intel(R) Corporation",
 		SecretRotationGracePeriodRatio: security.SecretRotationGracePeriodRatioEnv,
 	}

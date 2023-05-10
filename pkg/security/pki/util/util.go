@@ -47,7 +47,7 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 		log.Warnf("Can't init sgx Context: ", err)
 		return nil, err
 	}
-	if err = st.SgxContext.InitializeKey(st.SgxConfigs.HSMKeyLabel, st.SgxConfigs.HSMKeyType, security.DefaultRSAKeysize); err != nil {
+	if err = st.SgxContext.InitializeKey(st.SgxConfigs.HSMKeyLabel, st.SgxConfigs.HSMKeyType, security.RSAKeySizeEnv); err != nil {
 		log.Warnf("failed to create default private key via sgx: ", err)
 		return nil, err
 	}

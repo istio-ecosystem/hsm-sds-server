@@ -114,7 +114,7 @@ WORKDIR /
 
 RUN cp /home/istio-proxy/sgx/include/* /usr/local/include/
 
-COPY ../ /hsm-sds-server
+COPY ./ /hsm-sds-server
 
 RUN wget https://golang.org/dl/go1.20.3.linux-amd64.tar.gz \
   && tar -C /usr/local -xzf go1.20.3.linux-amd64.tar.gz \
