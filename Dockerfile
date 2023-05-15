@@ -24,6 +24,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG DCAP_VERSION="1.16.100.2"
 # SGX prerequisites
 # hadolint ignore=DL3005,DL3008
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update \
   && apt-get install --no-install-recommends -y \
     ca-certificates \
@@ -71,17 +72,18 @@ WORKDIR /opt/intel
 
 # Install SGX SDK
 # hadolint ignore=DL4006
-RUN wget https://download.01.org/intel-sgx/sgx-linux/2.19/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
+RUN wget -q https://download.01.org/intel-sgx/sgx-linux/2.19/distro/ubuntu20.04-server/$SGX_SDK_INSTALLER \
   && chmod +x  $SGX_SDK_INSTALLER \
   && echo "yes" | ./$SGX_SDK_INSTALLER \
   && rm $SGX_SDK_INSTALLER \
   && ls -l /opt/intel/
 
 # Tag/commit-id/branch to use for bulding CTK
-ARG CTK_TAG="master"
+ARG CTK_BRANCH="master"
+ARG CTK_COMMIT_D="91ee496"
 
 # Copy CTK patch
-ADD patches/Fix-CTK-multiple-thread-issues.patch /tmp/
+COPY patches/Fix-CTK-multiple-thread-issues.patch /tmp/
 
 # Intel crypto-api-toolkit prerequisites
 #https://github.com/intel/crypto-api-toolkit#software-requirements
@@ -93,9 +95,10 @@ RUN set -x && apt-get update \
     opensc sudo \
     automake \
   && apt-get clean \
-  && git clone https://github.com/intel/crypto-api-toolkit.git \
-  && cd /opt/intel/crypto-api-toolkit \
-  && git checkout ${CTK_TAG} -b v${CTK_TAG} \
+  && git clone https://github.com/intel/crypto-api-toolkit.git
+
+WORKDIR /opt/intel/crypto-api-toolkit
+RUN git checkout ${CTK_COMMIT_D} -b v${CTK_BRANCH} \
   && git apply /tmp/Fix-CTK-multiple-thread-issues.patch \
   # disable building tests
   && sed -i -e 's;test;;g' ./src/Makefile.am \
@@ -116,13 +119,14 @@ RUN cp /home/istio-proxy/sgx/include/* /usr/local/include/
 
 COPY ./ /hsm-sds-server
 
-RUN wget https://golang.org/dl/go1.20.3.linux-amd64.tar.gz \
-  && tar -C /usr/local -xzf go1.20.3.linux-amd64.tar.gz \
-  && export PATH=$PATH:/usr/local/go/bin \
+RUN wget -q https://golang.org/dl/go1.20.3.linux-amd64.tar.gz \
+  && tar -C /usr/local -xzf go1.20.3.linux-amd64.tar.gz
+
+WORKDIR /hsm-sds-server
+RUN  export PATH=$PATH:/usr/local/go/bin \
   && export GOPATH=$HOME/go \
   && export PATH=$PATH:$GOPATH/bin \
-  && cd /hsm-sds-server \
-  && LIBRARY_PATH=/usr/local/lib go build -o sds-server main.go 
+  && LIBRARY_PATH=/usr/local/lib go build -o sds-server main.go
 ###
 # Clean runtime image which supposed to
 # contain all runtime dependecy packages
@@ -132,8 +136,9 @@ FROM ubuntu:focal as runtime
 ARG SDK_VERSION="2.19.100.3"
 ARG DCAP_VERSION="1.16.100.2"
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update \
-  && apt-get install -y wget gnupg \
+  && apt-get install -y --no-install-recommends wget gnupg ca-certificates\
   && echo "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main" >> /etc/apt/sources.list.d/intel-sgx.list \
   && wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - \
   && sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
@@ -166,27 +171,30 @@ RUN apt-get update \
 FROM ubuntu:focal as sources
 COPY --from=runtime /usr/local/share/package-install.log /usr/local/share/package-install.log
 COPY --from=runtime /usr/share/doc /tmp/runtime-doc
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN sed -i '/deb-src/s/^# //' /etc/apt/sources.list \
      && apt-get update \
-     && mkdir /usr/local/share/package-sources && cd /usr/local/share/package-sources \ 
-     && apt-get install -y git \
+     && mkdir /usr/local/share/package-sources
+
+WORKDIR /usr/local/share/package-sources
+RUN  apt-get install -y --no-install-recommends git ca-certificates\
      && git clone https://github.com/hashicorp/go-multierror.git \
      && git clone https://github.com/hashicorp/go-version.git \
      && git clone https://github.com/hashicorp/golang-lru.git \
      && grep ^Get: /usr/local/share/package-install.log | grep -v sgx | cut -d ' ' -f 5,7 | \
-         while read pkg version; do \
-          if ! [ -f /tmp/runtime-doc/$pkg/copyright ]; then \
+         while read -r pkg version; do \
+          if ! [ -f /tmp/runtime-doc/"$pkg"/copyright ]; then \
                     echo "ERROR: missing copyright file for $pkg"; \      
           fi; \
-          if matches=$(grep -w -e MPL -e GPL -e LGPL /tmp/runtime-doc/$pkg/copyright); then \
+          if matches=$(grep -w -e MPL -e GPL -e LGPL /tmp/runtime-doc/"$pkg"/copyright); then \
              echo "INFO: downloading source of $pkg because of the following licenses:"; \
-             echo "$matches" | sed -e 's/^/    /'; \
+             echo "$matches" \
             # temperory fix: Remove exit 1
             # error occured because run: apt-get source --download-only libsqlite3-0=3.31.1-4ubuntu0.3 
             # since get the version 3.31.1-4ubuntu0.3 in package-install.log
             # but ubuntu updated debain pkg to 3.31.1-4ubuntu0.4
             # https://packages.ubuntu.com/search?keywords=libsqlite3-0
-             apt-get source --download-only $pkg=$version; \
+             apt-get source --download-only "$pkg"="$version"; \
           else \
              echo "INFO: not downloading source of $pkg, found no copyleft license"; \
           fi; \
@@ -208,12 +216,13 @@ ARG USER_UID=1337
 ARG USER_GID=$USER_UID
 
 RUN export DEBIAN_FRONTEND=noninteractive \
-  && apt-get update && apt-get -y install opensc \
+  && apt-get update && apt-get -y install --no-install-recommends opensc \
   && groupadd --gid $USER_GID $USERNAME \
-  && useradd --create-home --home-dir /home/istio-proxy --uid $USER_UID --gid $USER_GID -m $USERNAME
+  && useradd --create-home --home-dir /home/istio-proxy --uid $USER_UID --gid $USER_GID -m $USERNAME \
+  && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME  
-ADD prepare.sh /home/istio-proxy/prepare.sh
+COPY prepare.sh /home/istio-proxy/prepare.sh
 # RUN /bin/sh prepare.sh
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV SGX_LIBRARY_PATH="/home/istio-proxy/sgx/lib"
