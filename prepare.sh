@@ -8,21 +8,17 @@ copy_libraries () {
 
 set_rpath () {
     ls $SGX_LIBRARY_PATH
-    patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/libp11sgx.so
-    patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/libsgx_dcap_ql.so.1
-    patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/libsgx_enclave_common.so.1
-    patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/libsgx_pce_logic.so.1
-    patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/libsgx_qe3_logic.so
-    patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/libsgx_urts.so
+    libs=$(ls $SGX_LIBRARY_PATH | grep -v 'libp11SgxEnclave.signed.so')
+    for lib in $libs; do
+        patchelf --set-rpath $SGX_LIBRARY_PATH $SGX_LIBRARY_PATH/$lib
+    done
 }
 
 check_rpath () {
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libp11sgx.so
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_dcap_ql.so.1
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_enclave_common.so.1
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_pce_logic.so.1
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_qe3_logic.so
-    patchelf --print-rpath $SGX_LIBRARY_PATH/libsgx_urts.so 
+    libs=$(ls $SGX_LIBRARY_PATH | grep -v 'libp11SgxEnclave.signed.so')
+    for lib in $libs; do
+        patchelf --print-rpath $SGX_LIBRARY_PATH/$lib
+    done
 }
 
 copy_libraries

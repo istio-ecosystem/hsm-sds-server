@@ -223,6 +223,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
 USER $USERNAME  
 COPY prepare.sh /home/istio-proxy/prepare.sh
+COPY copy-sgx-libs.sh /home/istio-proxy/copy-sgx-libs.sh
 # RUN /bin/sh prepare.sh
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV SGX_LIBRARY_PATH="/home/istio-proxy/sgx/lib"
@@ -235,11 +236,9 @@ COPY --from=builder /hsm-sds-server/sds-server /sds/sds-server
 COPY --from=builder /usr/bin/patchelf /usr/bin/patchelf
 COPY --from=builder $SGX_LIBRARY_PATH/libp11SgxEnclave.signed.so $SGX_TMP_LIBRARY_PATH/libp11SgxEnclave.signed.so
 COPY --from=builder $SGX_LIBRARY_PATH/libp11sgx.so $SGX_TMP_LIBRARY_PATH/libp11sgx.so
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_dcap_ql.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_dcap_ql.so.1
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_urts.so $SGX_TMP_LIBRARY_PATH/libsgx_urts.so
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_qe3_logic.so $SGX_TMP_LIBRARY_PATH/libsgx_qe3_logic.so
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_pce_logic.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_pce_logic.so.1
-COPY --from=builder /lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 $SGX_TMP_LIBRARY_PATH/libsgx_enclave_common.so.1
+
+# Copy SGX libs based on libp11sgx.so's dependency
+RUN /home/istio-proxy/copy-sgx-libs.sh
 
 # Copy licenses and sources
 COPY --from=builder /usr/local/share/package-licenses /usr/local/share/package-licenses
