@@ -22,9 +22,7 @@ const (
 )
 
 var (
-	sgxLibNames = []string{"libp11SgxEnclave.signed.so", "libp11sgx.so",
-		"libsgx_dcap_ql.so.1", "libsgx_enclave_common.so.1",
-		"libsgx_pce_logic.so.1", "libsgx_qe3_logic.so", "libsgx_urts.so"}
+	sgxLibNames = []string{"libp11SgxEnclave.signed.so", "libp11sgx.so"}
 )
 
 var (
