@@ -79,18 +79,18 @@ func (qa *QuoteAttestationWatcher) onQuoteAttestationUpdate(obj any) {
 
 func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 	log.Info("Start to run QuoteAttestationWatcher Reconcile")
-	log.Info("Namespace: ", req.Namespace, " Name: ", req.Name)
+	log.Infof("Namespace: ", req.Namespace, " Name: ", req.Name)
 	qaObj, err := qa.qaLister.QuoteAttestations(req.Namespace).Get(req.Name)
 	if err != nil {
 		log.Errorf("Reconcile: unable to fetch Quote Attestation CR %s under the namespace %s : %v", req.Name, req.Namespace, err)
 		return err
 	}
 	var statusErr error
-	log.Info("need to check: ", qaObj.ObjectMeta.DeletionTimestamp.IsZero())
+	log.Infof("need to check: ", qaObj.ObjectMeta.DeletionTimestamp.IsZero())
 	if qaObj.ObjectMeta.DeletionTimestamp.IsZero() {
 		log.Info("checking quoteattestation status")
-		log.Info("QA Status: ", qaObj.Status)
-		log.Info("QA SecretName: ", qaObj.Spec.SecretName)
+		log.Infof("QA Status: ", qaObj.Status)
+		log.Infof("QA SecretName: ", qaObj.Spec.SecretName)
 		var attesReady bool
 		var cMessage string
 		if qaObj.Spec.SecretName == "" {
@@ -100,11 +100,11 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		// it's unnecessary to provide the secret name if it's manual operation
 		if !security.ManualOPForGateway {
 			if len(qaObj.Status.Conditions) == 0 {
-				log.Info("QA Conditions lenght is: ", 0)
+				log.Infof("QA Conditions lenght is: ", 0)
 				return nil
 			}
 			for _, c := range qaObj.Status.Conditions {
-				log.Info("QuoteAttestationWatcher Reconcile QA status: ", c.Type)
+				log.Infof("QuoteAttestationWatcher Reconcile QA status: ", c.Type)
 				if c.Type == quoteapi.ConditionReady {
 					attesReady = true
 					break
@@ -114,7 +114,7 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 			}
 			if !attesReady {
 				message := "quote attestation verification failure"
-				log.Error(fmt.Errorf(message), "message", cMessage)
+				log.Errorf(fmt.Errorf(message), "message", cMessage)
 				return fmt.Errorf(message)
 			}
 		}
@@ -125,7 +125,7 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 
 		log.Info("using KMRA based secret.")
 		if err = qa.loadKMRASecret(qa.kubeClient, secretName, signer, req.Namespace); err != nil {
-			log.Error(err, "failed to load private key for signer ", signer)
+			log.Errorf(err, "failed to load private key for signer ", signer)
 			statusErr = multierror.Append(statusErr, err)
 			return statusErr
 		}
@@ -133,11 +133,11 @@ func (qa *QuoteAttestationWatcher) Reconcile(req types.NamespacedName) error {
 		ctx := context.Background()
 		err = qa.tcsClient.QuoteAttestations(req.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		if err != nil {
-			log.Error(err, "failed to delete the quoteattestation cr ", instanceName)
+			log.Errorf(err, "failed to delete the quoteattestation cr ", instanceName)
 		}
 		err = qa.kubeClient.CoreV1().Secrets(req.Namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 		if err != nil {
-			log.Error(err, "failed to delete the secret ", secretName)
+			log.Errorf(err, "failed to delete the secret ", secretName)
 		}
 	} else {
 		err := qa.qaSM.SgxContext.RemoveKeyForSigner(EnclaveQuoteKeyObjectLabel)
@@ -186,7 +186,7 @@ func (qa *QuoteAttestationWatcher) loadKMRASecret(kubeClient kubernetes.Interfac
 	credMap := qa.qaSM.GetCredMap()
 	for credKey, cred := range credMap {
 		credName := cred.GetSGXKeyLable()
-		log.Info("CredName: ", credName)
+		log.Infof("CredName: ", credName)
 		if credName == signerName {
 			if len(certData) > 0 {
 				log.Info("certData is not empty")

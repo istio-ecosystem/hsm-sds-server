@@ -55,7 +55,7 @@ func NewSecretManager(options *security.CertOptions) (*security.SecretManager, e
 
 	csrPem, err := st.GenerateCSR(*options, security.NeedQuoteExtension)
 	if err != nil {
-		log.Info("failed to generate Kubernetes CSR: ", err)
+		log.Infof("failed to generate Kubernetes CSR: ", err)
 		return nil, err
 	}
 	// todo: replace it via reading from CSR

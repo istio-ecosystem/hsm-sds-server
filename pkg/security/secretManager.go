@@ -250,7 +250,7 @@ func (sc *SecretManager) GenerateCSR(options CertOptions, needQuoteExtension boo
 		ServiceAccount: ServiceAccount,
 	}
 
-	log.Info("SPIFFE ID: ", csrHostName)
+	log.Infof("SPIFFE ID: ", csrHostName)
 	options.Host = csrHostName.String()
 	if needQuoteExtension {
 		if err = sc.SgxContext.GenerateQuoteAndPublicKey(false, ""); err != nil {
@@ -444,9 +444,9 @@ func (sc *SecretManager) SetCredMap(key string, cred *GatewayCred) {
 }
 
 func (sc *SecretManager) DeleteCredWithKey(key string) bool {
-	log.Info("Delete credSMap with key %v", key)
+	log.Infof("Delete credSMap with key %v", key)
 	credMap := sc.Cache.credMap
-	log.Info("CredMap: ", credMap)
+	log.Infof("CredMap: ", credMap)
 	if credMap != nil {
 		return false
 	}

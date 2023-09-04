@@ -360,7 +360,7 @@ func (ctx *SgxContext) initializeToken() error {
 
 	if err := cmd.Run(); err != nil {
 		// ctx.log.Info("command", cmd.Args, "output", cmd.Stdout)
-		log.Info("command", cmd.Args, "output", cmd.Stdout)
+		log.Infof("command", cmd.Args, "output", cmd.Stdout)
 		return fmt.Errorf("failed to initialize token: %v", err)
 	}
 
@@ -736,7 +736,7 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 
 	rsaPkcsOaepMech := pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, pkcs11.NewOAEPParams(pkcs11.CKM_SHA_1, pkcs11.CKG_MGF1_SHA1, pkcs11.CKZ_DATA_SPECIFIED, nil))
 	swkHandle, err := pCtx.UnwrapKey(ctx.p11Session, []*pkcs11.Mechanism{rsaPkcsOaepMech}, quotePrvKey, wrappedSWK, attributeSWK)
-	log.Info("provisionKey swkHandle: ", swkHandle)
+	log.Infof("provisionKey swkHandle: ", swkHandle)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap symmetric wrapping key: %v", err)
 	}
@@ -771,7 +771,7 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 	}
 	publicKeyAttrs, err := ctx.p11Ctx.GetAttributeValue(ctx.p11Session, prvKey, template)
 	if err != nil {
-		log.Info("Failed to fetch public attributes: %v", err)
+		log.Infof("Failed to fetch public attributes: %v", err)
 	}
 	publicKeyAttrs = append(publicKeyAttrs, []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
@@ -780,7 +780,7 @@ func (ctx *SgxContext) provisionKey(keyLabel string, wrappedSWK []byte, wrappedK
 		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
 	}...)
 	if _, err := ctx.p11Ctx.CreateObject(ctx.p11Session, publicKeyAttrs); err != nil {
-		log.Info("Failed to add public key object", "error", err)
+		log.Infof("Failed to add public key object", "error", err)
 	}
 	log.Info("Unwrapped Public Key successfully")
 

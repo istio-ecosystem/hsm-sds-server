@@ -96,7 +96,7 @@ func newSDSService(kubeconfig, configContext string) *sdsservice {
 
 	if sdsSvc != nil {
 		if err := sdsSvc.initSDSClient(kubeconfig, configContext); err != nil {
-			log.Info("initSDSClient: init kube SDS client error: ", err)
+			log.Infof("initSDSClient: init kube SDS client error: ", err)
 		}
 
 		// New a GateWayWatcher to watch the credential name of SDS service
@@ -232,7 +232,7 @@ func (s *sdsservice) Close() {
 }
 
 func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *discovery.DiscoveryResponse, err error) {
-	log.Info("Build respunse now: ", time.Now())
+	log.Infof("Build respunse now: ", time.Now())
 	log.Info(s.VersionInfoandNonce)
 	resp = &discovery.DiscoveryResponse{
 		TypeUrl: req.TypeUrl,
@@ -261,15 +261,15 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 		} else if isGateway {
 			var myCred *security.GatewayCred
 			credMap := s.st.GetCredMap()
-			log.Info("Cred Map lenght: ", len(credMap))
+			log.Infof("Cred Map lenght: ", len(credMap))
 			resName := resourceName
 			for credKey, cred := range credMap {
 				lableKey := s.st.GetLableKeyWithKeyForGateway(credKey)
 				sdsPrefixLableKey := security.HandleCredNameForEnvoy(resourceName)
 				sdsSuffixLableKey := strings.TrimSuffix(sdsPrefixLableKey, security.SDSCredNameSuffix)
-				log.Info("lableKey: ", lableKey)
-				log.Info("sdsPrefixLableKey: ", sdsPrefixLableKey)
-				log.Info("sdsSuffixLableKey: ", sdsSuffixLableKey)
+				log.Infof("lableKey: ", lableKey)
+				log.Infof("sdsPrefixLableKey: ", sdsPrefixLableKey)
+				log.Infof("sdsSuffixLableKey: ", sdsSuffixLableKey)
 				if lableKey == sdsPrefixLableKey || lableKey == sdsSuffixLableKey {
 					myCred = cred
 					resName = lableKey
@@ -286,7 +286,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				<-myCred.CertSync
 				log.Info("certificate data arrive")
 				cert = myCred.GetCertData()
-				log.Info("certificate data: ", cert)
+				log.Infof("certificate data: ", cert)
 				if cert == nil {
 					return nil, fmt.Errorf("no available certificate for resource [%s]", resName)
 				}
@@ -295,7 +295,7 @@ func (s *sdsservice) buildResponse(req *discovery.DiscoveryRequest) (resp *disco
 				<-myCred.RootSync
 				log.Info("rootCA data arrive")
 				gwRootCA = myCred.GetRootData()
-				log.Info("root CA data: ", gwRootCA)
+				log.Infof("root CA data: ", gwRootCA)
 				if len(gwRootCA) == 0 {
 					return nil, fmt.Errorf("no available rootCA for resource [%s]", resName)
 				}
@@ -376,11 +376,11 @@ func (s *sdsservice) registerSecret(item security.SecretItem, resourceName strin
 	security.CertExpirySeconds.ValueFrom(func() float64 { return time.Until(item.ExpireTime).Seconds() }, item.ResourceName)
 	item.ResourceName = resourceName
 	if s.st.Cache.GetWorkload() != nil {
-		log.Info("%v skip scheduling certificate rotation, already scheduled", resourceName)
+		log.Infof("%v skip scheduling certificate rotation, already scheduled", resourceName)
 		return
 	}
 	s.st.Cache.SetWorkload(&item)
-	log.Info(resourceName, ": scheduled certificate for rotation in ", delay)
+	log.Infof(resourceName, ": scheduled certificate for rotation in ", delay)
 
 	s.st.DelayQueue.PushDelayed(func() error {
 		// Clear the cache so the next call generates a fresh certificate

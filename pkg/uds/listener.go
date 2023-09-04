@@ -20,7 +20,7 @@ func NewListener(path string) (net.Listener, error) {
 	// Attempt to create the folder in case it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		// If we cannot create it, just warn here - we will fail later if there is a real error
-		log.Info("Failed to create directory for ", path, ":", err)
+		log.Infof("Failed to create directory for ", path, ":", err)
 	}
 
 	var err error
