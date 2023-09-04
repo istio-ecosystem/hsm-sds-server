@@ -34,7 +34,7 @@ var (
 		Use:   "wait",
 		Short: "Waits until the hsm sds server is ready",
 		RunE: func(c *cobra.Command, args []string) error {
-			log.Info("Waiting for hsm sds server to be ready (timeout:" + strconv.Itoa(timeoutSeconds) + " seconds)...")
+			log.Infof("Waiting for hsm sds server to be ready (timeout:" + strconv.Itoa(timeoutSeconds) + " seconds)...")
 			ctx := context.Background()
 			var err error
 			timeout := time.After(time.Duration(timeoutSeconds) * time.Second)
@@ -48,13 +48,13 @@ var (
 					// SDS server checking process
 					mTLSExists, mTLSErr := checkSocket(ctx, security.WorkloadIdentitySocketPath)
 					if mTLSErr != nil {
-						log.Info("Not ready yet for mTLS SDS server error: ", mTLSErr)
+						log.Infof("Not ready yet for mTLS SDS server error: ", mTLSErr)
 						err = mTLSErr
 						continue
 					}
 					sgxLibReady, libErr := checkSGXLibs(security.SgxLibraryPrefix)
 					if libErr != nil {
-						log.Info("Not ready yet for mTLS SDS server error: ", libErr)
+						log.Infof("Not ready yet for mTLS SDS server error: ", libErr)
 						err = libErr
 						continue
 					}
@@ -102,10 +102,10 @@ func checkSGXLibs(sgxLibPathPrefix string) (bool, error) {
 		fi, err := os.Stat(sgxlibpath)
 		if err != nil || !fi.Mode().IsRegular() {
 			libReady = false
-			log.Info("%v is not ready", sgxlibpath)
+			log.Infof("%v is not ready", sgxlibpath)
 			return false, err
 		} else {
-			log.Info("find %v", sgxlibpath)
+			log.Infof("find %v", sgxlibpath)
 		}
 	}
 	return libReady, nil

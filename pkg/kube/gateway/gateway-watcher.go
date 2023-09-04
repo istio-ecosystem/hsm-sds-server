@@ -112,7 +112,7 @@ func (gw *GatewayWatcher) onGatewayAdd(obj any) {
 				log.Errorf("failed to created or updated quoteAttestation CR %s", err)
 				return
 			}
-			log.Info("QuoteAttestation CR created or updated ", "name", instanceName)
+			log.Infof("QuoteAttestation CR created or updated ", "name", instanceName)
 		} else {
 			gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		}
@@ -157,11 +157,11 @@ func (gw *GatewayWatcher) onGatewayDelete(obj any) {
 						secretName := qaCR.Spec.SecretName
 						err = gw.tcsClient.QuoteAttestations(gatewayCR.Namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 						if err != nil {
-							log.Warn(err, "failed to delete the quoteattestation cr ", instanceName)
+							log.Warnf(err, "failed to delete the quoteattestation cr ", instanceName)
 						}
 						err = gw.kubeClient.CoreV1().Secrets(gatewayCR.Namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 						if err != nil {
-							log.Warn(err, "failed to delete the secret ", secretName)
+							log.Warnf(err, "failed to delete the secret ", secretName)
 						}
 					}
 
@@ -297,7 +297,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 	if err != nil && k8sErrors.IsNotFound(err) {
 		_, err := gw.tcsClient.QuoteAttestations(ns).Create(ctx, quoteAttestation, metav1.CreateOptions{})
 		if err != nil {
-			log.Error(err, "Failed to create QuoteAttestation CR")
+			log.Errorf(err, "Failed to create QuoteAttestation CR")
 		}
 		return err
 	}
@@ -317,7 +317,7 @@ func (gw *GatewayWatcher) QuoteAttestationDeliver(ctx context.Context, signerNam
 		}
 		_, err := gw.tcsClient.QuoteAttestations(ns).Update(ctx, quoteAttestation, metav1.UpdateOptions{})
 		if err != nil {
-			log.Error(err, "Failed to update QuoteAttestation CR")
+			log.Errorf(err, "Failed to update QuoteAttestation CR")
 		}
 		return err
 	}

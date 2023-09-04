@@ -14,6 +14,7 @@ import (
 
 	"istio-ecosystem/hsm-sds-server/internal/sgx"
 	"istio-ecosystem/hsm-sds-server/pkg/security"
+
 	"istio.io/pkg/log"
 	certv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -176,7 +177,7 @@ func getSignedCsr(client kubernetes.Interface, csrName string, readInterval time
 			// Certificate is ready
 			return r.Status.Certificate
 		}
-		log.Info(csrName, " ERROR: ", err, " times: ", i)
+		log.Infof(csrName, " ERROR: ", err, " times: ", i)
 		time.Sleep(readInterval)
 	}
 	if err != nil || r.Status.Certificate == nil {

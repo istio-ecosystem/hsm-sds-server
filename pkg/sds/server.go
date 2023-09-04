@@ -9,9 +9,10 @@ import (
 	"google.golang.org/grpc"
 	"istio.io/pkg/log"
 
-	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
 	"istio-ecosystem/hsm-sds-server/pkg/security"
 	"istio-ecosystem/hsm-sds-server/pkg/uds"
+
+	sdsv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
 )
 
 const (
@@ -69,14 +70,14 @@ func (s *Server) Start(ctx context.Context) error {
 	var err error
 	s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath)
 	if err != nil {
-		log.Info("mTLS listen generation error ", err)
+		log.Infof("mTLS listen generation error ", err)
 		return err
 	}
 	log.Info("Starting mTLS SDS grpc server")
 	log.Infof("mTLS Listener addr: %v", s.grpcWorkloadListener.Addr())
 	if s.grpcWorkloadListener == nil {
 		if s.grpcWorkloadListener, err = uds.NewListener(security.WorkloadIdentitySocketPath); err != nil {
-			log.Info("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
+			log.Infof("mTLS SDS grpc server for workload proxies failed to set up UDS: ", err)
 		}
 	}
 	go func() {
@@ -85,14 +86,14 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.grpcGatewayListener, err = uds.NewListener(security.GatewayIdentitySocketPath)
 	if err != nil {
-		log.Info("gateway listen generation error ", err)
+		log.Infof("gateway listen generation error ", err)
 		return err
 	}
 	log.Info("Starting gateway SDS grpc server")
 	log.Infof("gateway Listener addr: %v", s.grpcGatewayListener.Addr())
 	if s.grpcGatewayListener == nil {
 		if s.grpcGatewayListener, err = uds.NewListener(security.GatewayIdentitySocketPath); err != nil {
-			log.Info("gateway SDS grpc server for gateway failed to set up UDS: ", err)
+			log.Infof("gateway SDS grpc server for gateway failed to set up UDS: ", err)
 		}
 	}
 	go func() {
