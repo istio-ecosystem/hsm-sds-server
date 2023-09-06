@@ -18,9 +18,9 @@ require (
 	go.uber.org/atomic v1.11.0
 	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
-	istio.io/api v1.19.0-rc.0
-	istio.io/client-go v1.19.0-alpha.1.0.20230831153909-c8a4b43e3e65
-	istio.io/istio v0.0.0-20230903030521-6e845ca3d2aa
+	istio.io/api v1.19.0-rc.0.0.20230828012244-464da4944bb2
+	istio.io/client-go v1.19.0-rc.0
+	istio.io/istio v0.0.0-20230901023555-3b3ca8ec1632
 	istio.io/pkg v0.0.0-20230523202533-240922a4c9ad
 	k8s.io/api v0.28.1
 	k8s.io/apiextensions-apiserver v0.28.1
