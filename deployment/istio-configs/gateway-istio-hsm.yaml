@@ -5,7 +5,7 @@ metadata:
 spec:
   profile: default
   hub: "intel"
-  tag: "1.16.1-intel.0"
+  tag: "1.19.0"
   components:
     pilot:
       k8s:
@@ -80,7 +80,7 @@ spec:
           spec:
             containers:
             - name: sdsserver
-              image: sds-server/sds-server:demo-309
+              image: intel/hsm-sds-server:1.19.0
               imagePullPolicy: IfNotPresent 
               lifecycle:
                 postStart:
@@ -182,7 +182,7 @@ spec:
           sgx.intel.com/quote-provider: aesmd
         additionalContainers:
           - name: sdsserver
-            image: sds-server/sds-server:demo-309
+            image: intel/hsm-sds-server:1.19.0
             imagePullPolicy: IfNotPresent 
             lifecycle:
               postStart:

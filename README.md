@@ -138,7 +138,7 @@ It can be seen from the config file that the `private_key_provider` configuation
 ### Protect the private keys of gateways with HSM
 1. Install Istio
 
-> NOTE: for the below command you need to use the `istioctl` for the `docker.io/intel/istioctl:1.16.1-intel.0` since only that contains Istio manifest enhancements for SGX mTLS.
+> NOTE: for the below command you need to use the `istioctl` for the `docker.io/intel/istioctl:1.19.0` since only that contains Istio manifest enhancements for SGX mTLS.
 You can also customize the `intel-istio-sgx-gateway.yaml`.
 
 ```sh
