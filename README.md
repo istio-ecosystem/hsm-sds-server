@@ -76,11 +76,6 @@ $ kubectl get clusterissuers istio-system -o jsonpath='{.spec.ca.secretName}' | 
 $ kubectl apply -f https://github.com/intel/trusted-certificate-issuer/tree/main/deployment/crds
 ```
 
-### Build image
-```sh
-$ make docker
-```
-> NOTE: If you are using containerd as the container runtime, run `make ctr` to build the image instead.
 ### Protect the private keys of workloads with HSM
 1. Install Istio
 
@@ -146,7 +141,7 @@ istioctl install -f ./deployment/istio-configs/gateway-istio-hsm.yaml -y
 ```
 Note: please execute `kubectl apply -f deployment/istio-configs/gateway-clusterrole.yaml` to make sure that the ingress gateway has enough privilege.
 
-1. Verifiy the pods are running
+2. Verifiy the pods are running
 
 By deault, `Istio` will be installed in the `istio-system` namespce
 
@@ -169,7 +164,7 @@ kubectl apply -f ./deployment/istio-configs/httpbin-gateway.yaml
 
 > A reminder, if you want to apply other workloads, please make sure to add the correct RBAC rules for its `Service Account`. For details, please refer to the configuration of `ClusterRole` in `./deployment/istio-configs/httpbin-hsm.yaml`.
 
-Successful deployment looks like this:
+4. Successful deployment looks like this:
 
 Verify the httpbin pod:
 ```sh
@@ -196,7 +191,7 @@ Manually get the quoteattestation name via below command
 ```sh
 $ export QA_NAME=<YOUR QUOTEATTESTATION NAME>
 ```
-4. Prepare credential information:
+5. Prepare credential information:
 
 We use command line tools to read and write the QuoteAttestation manually. You get the tools, `km-attest` and `km-wrap`, provided by the [Intel® KMRA project](https://www.intel.com/content/www/us/en/developer/topic-technology/open/key-management-reference-application/overview.html).
 
@@ -227,7 +222,7 @@ $ openssl x509 -req -sha256 -days 365 -CA $CREDENTIAL/example.com.crt -CAkey $CR
 }
 ```
 
-5. Update credential quote attestation CR with secret contained wrapped key
+6. Update credential quote attestation CR with secret contained wrapped key
 
 ```sh
 $ WRAPPED_KEY=$(km-wrap --signer tcsclusterissuer.tcs.intel.com/sgx-signer --pubkey $CREDENTIAL/public.key --pin "HSMUserPin" --token "HSMSDSServer" --module /usr/local/lib/softhsm/libsofthsm2.so)
@@ -238,7 +233,7 @@ Edit quoteattestations.tcs.intel.com $QA_NAME via commond `kubectl edit quoteatt
 
 The above `httpbin` application has enabled SGX and store the private key inside the SGX enclave, completed the TLS handshakes and established a connection with each other and communicating normally.
 
-6. Verify the service accessibility
+7. Verify the service accessibility
 
 ```sh
 $ export INGRESS_NAME=istio-ingressgateway
