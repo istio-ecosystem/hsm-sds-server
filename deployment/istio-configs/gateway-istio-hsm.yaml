@@ -97,6 +97,9 @@ spec:
                   memory: 300Mi
                   sgx.intel.com/enclave: 1
                   sgx.intel.com/epc: 1Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
               env:
               - name: NEED_QUOTE
                 value: "false"
@@ -199,6 +202,9 @@ spec:
                 memory: 300Mi
                 sgx.intel.com/enclave: 1
                 sgx.intel.com/epc: 1Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
             env:
             - name: POD_NAME
               valueFrom:
